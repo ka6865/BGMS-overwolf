@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BGMS Companion</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="desktop-shell">
+    <main class="desktop-page">
+      <section class="desktop-hero" aria-labelledby="app-title">
+        <img src="assets/bgms-icon.svg" alt="" class="desktop-logo">
+        <div>
+          <p class="eyebrow">BGMS Companion for PUBG</p>
+          <h1 id="app-title">Live match context, clean post-match handoff.</h1>
+          <p class="lede">
+            BGMS Companion shows a compact in-game status overlay and prepares a session summary for BGMS after the match ends.
+          </p>
+        </div>
+      </section>
+
+      <section class="desktop-grid" aria-label="App status">
+        <article class="panel">
+          <h2>Phase 1 scope</h2>
+          <ul class="scope-list">
+            <li>Match start and match end state</li>
+            <li>Phase, local health, weapon state</li>
+            <li>Kills, deaths, revives, killer notice</li>
+            <li>Roster-based alive player count</li>
+          </ul>
+        </article>
+
+        <article class="panel">
+          <h2>Policy guardrails</h2>
+          <ul class="scope-list">
+            <li>No real-time damage meter</li>
+            <li>No live location or minimap</li>
+            <li>No PUBG API calls from live GEP triggers</li>
+            <li>No service role or Supabase secrets in the app</li>
+          </ul>
+        </article>
+      </section>
+    </main>
+  </body>
+</html>

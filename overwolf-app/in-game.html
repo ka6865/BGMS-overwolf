@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BGMS Companion Overlay</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="overlay-shell">
+    <main class="overlay-card" aria-label="BGMS Companion live overlay">
+      <header class="overlay-header">
+        <div>
+          <p class="eyebrow">BGMS Companion</p>
+          <h1 id="match-state">Waiting for PUBG</h1>
+        </div>
+        <div class="phase-pill" id="phase">Idle</div>
+      </header>
+
+      <section class="metric-grid" aria-label="Live match metrics">
+        <div class="metric">
+          <span class="metric-label">Kills</span>
+          <strong id="kills">0</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Alive</span>
+          <strong id="alive">--</strong>
+        </div>
+        <div class="metric">
+          <span class="metric-label">Health</span>
+          <strong id="health">--</strong>
+        </div>
+      </section>
+
+      <section class="status-row" aria-label="Player state">
+        <span id="weapon-state">Weapon state unknown</span>
+        <span id="last-event">No live events yet</span>
+      </section>
+    </main>
+
+    <script src="in-game.js"></script>
+  </body>
+</html>

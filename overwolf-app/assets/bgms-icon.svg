@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="BGMS Companion">
+  <rect width="256" height="256" rx="48" fill="#091513"/>
+  <path d="M55 74h88c28 0 48 20 48 48v60H91c-27 0-48-21-48-48V86c0-7 5-12 12-12Z" fill="#102923"/>
+  <path d="M72 93h67c17 0 30 13 30 30v40H94c-17 0-30-13-30-30v-32c0-5 3-8 8-8Z" fill="#5ee3a1"/>
+  <path d="M98 118h39c6 0 11 5 11 11v14h-43c-6 0-11-5-11-11v-10c0-2 2-4 4-4Z" fill="#091513"/>
+  <path d="M185 66l20 20-20 20-20-20 20-20Z" fill="#f3bd4e"/>
+</svg>

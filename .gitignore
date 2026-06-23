@@ -1,0 +1,36 @@
+AGENTS.md
+
+# 운영체제 및 에디터 파일
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 로그 파일
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 의존성 및 빌드 산출물
+node_modules/
+dist/
+build/
+out/
+.next/
+coverage/
+
+# 환경 변수 파일
+.env
+.env.*
+!.env.example
+
+# 오버울프 패키징 산출물
+*.opk
+*.owapp
+packages/
+release/
+releases/
