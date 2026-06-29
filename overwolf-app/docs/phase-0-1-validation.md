@@ -21,6 +21,7 @@
 ## Phase 1 App Checks
 
 - Confirm the manifest is accepted by the current Overwolf Developer Console.
+- Confirm packaged `.opk` files expose `manifest.json` at archive root, not under an extra parent directory.
 - Confirm `launch_events` starts the background page when PUBG launches.
 - Confirm PUBG game targeting ID in the Developer Console before packaging.
 - Confirm `setRequiredFeatures()` succeeds after PUBG starts.
