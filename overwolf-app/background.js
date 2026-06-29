@@ -47,7 +47,14 @@
       matchStartedAt: null,
       matchEnded: false,
       summarySent: false,
-      gepStatus: "idle"
+      gepStatus: "idle",
+      detectedGameId: null,
+      detectedGameRunning: false,
+      lastFeature: "",
+      lastKey: "",
+      lastRawValue: "",
+      lastGepEventName: "",
+      recentUpdates: []
     };
   }
 
@@ -132,11 +139,21 @@
   function handleGameInfo(gameInfo) {
     if (isPubgGameInfo(gameInfo)) {
       pubgRunning = true;
+      setState({
+        detectedGameId: gameInfo.id,
+        detectedGameRunning: true
+      });
       ensureGepSubscription();
       setOverlayVisible(true);
       return;
     }
 
+    if (gameInfo) {
+      setState({
+        detectedGameId: gameInfo.id || null,
+        detectedGameRunning: Boolean(gameInfo.isRunning)
+      });
+    }
     resetGepRuntimeState();
     setOverlayVisible(false);
   }
@@ -148,6 +165,8 @@
     requiredFeaturesInFlight = false;
 
     state = Object.assign(createInitialState(), {
+      detectedGameId: state.detectedGameId,
+      detectedGameRunning: state.detectedGameRunning,
       gepStatus: "idle",
       lastEvent: "Waiting for PUBG"
     });
@@ -260,6 +279,16 @@
   }
 
   function normalizeNumber(value) {
+    if (value && typeof value === "object") {
+      if (typeof value.health !== "undefined") {
+        return normalizeNumber(value.health);
+      }
+
+      if (typeof value.value !== "undefined") {
+        return normalizeNumber(value.value);
+      }
+    }
+
     var parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -292,10 +321,43 @@
     return String(value);
   }
 
+  function summarizeValue(value) {
+    var summary = "";
+
+    if (value === null || value === undefined) {
+      return "";
+    }
+
+    if (typeof value === "string") {
+      summary = value;
+    } else {
+      try {
+        summary = JSON.stringify(value);
+      } catch (_error) {
+        summary = String(value);
+      }
+    }
+
+    return summary.length > 80 ? summary.slice(0, 77) + "..." : summary;
+  }
+
+  function recordGepUpdate(kind, feature, key, rawValue) {
+    var label = [kind, feature || "-", key || "-"].join(":");
+    var recentUpdates = [label].concat(state.recentUpdates || []).slice(0, 4);
+
+    setState({
+      lastFeature: getStringValue(feature),
+      lastKey: getStringValue(key),
+      lastRawValue: summarizeValue(rawValue),
+      recentUpdates: recentUpdates
+    });
+  }
+
   function updateInfoFeature(feature, category, key, rawValue) {
     var value = safeParse(rawValue);
+    var normalizedKey = getStringValue(key);
 
-    if (feature === "phase" && key === "phase") {
+    if (normalizedKey === "phase") {
       setState({
         phase: getStringValue(value) || "Unknown",
         lastEvent: "Phase changed to " + (getStringValue(value) || "Unknown")
@@ -303,22 +365,22 @@
       return;
     }
 
-    if (feature === "match") {
+    if (feature === "match" || normalizedKey === "match_id" || normalizedKey === "pseudo_match_id" || normalizedKey === "mode") {
       updateMatchInfo(category, key, value);
       return;
     }
 
-    if (feature === "kill") {
+    if (feature === "kill" || normalizedKey === "kills" || normalizedKey === "kill") {
       updateKillInfo(key, value);
       return;
     }
 
-    if (feature === "roster") {
+    if (feature === "roster" || normalizedKey.indexOf("roster_") === 0) {
       updateRosterInfo(key, value);
       return;
     }
 
-    if (feature === "me") {
+    if (feature === "me" || normalizedKey === "health" || normalizedKey === "hp" || normalizedKey === "weaponState" || normalizedKey === "weapon_state" || normalizedKey === "weapon") {
       updateMeInfo(key, value);
     }
   }
@@ -355,7 +417,7 @@
   }
 
   function updateKillInfo(key, value) {
-    if (key !== "kills") {
+    if (key !== "kills" && key !== "kill") {
       return;
     }
 
@@ -424,7 +486,7 @@
   }
 
   function updateMeInfo(key, value) {
-    if (key === "health") {
+    if (key === "health" || key === "hp") {
       var nextHealth = normalizeNumber(value);
 
       if (nextHealth !== null) {
@@ -436,20 +498,57 @@
       return;
     }
 
-    if (key === "weaponState") {
+    if (key === "weaponState" || key === "weapon_state" || key === "weapon") {
       setState({
-        weaponState: getStringValue(value)
+        weaponState: formatWeaponState(value)
       });
     }
   }
 
+  function formatWeaponState(value) {
+    if (!value || typeof value !== "object") {
+      return getStringValue(value);
+    }
+
+    var weaponName = getStringValue(value.name);
+    var equipped = normalizeBoolean(value.equipped);
+    var count = normalizeNumber(value.count);
+    var parts = [];
+
+    if (weaponName) {
+      parts.push(weaponName);
+    }
+
+    if (equipped === true) {
+      parts.push("equipped");
+    } else if (equipped === false) {
+      parts.push("holstered");
+    }
+
+    if (count !== null) {
+      parts.push("x" + String(count));
+    }
+
+    return parts.join(" ").trim();
+  }
+
   function handleEvent(eventName, rawData) {
+    recordGepUpdate("event", "", eventName, rawData);
+    setState({
+      lastGepEventName: getStringValue(eventName)
+    });
+
     if (eventName === "matchStart") {
       var previousMatchContext = {
         matchId: state.matchId,
         pseudoMatchId: state.pseudoMatchId,
         effectiveMatchId: state.effectiveMatchId,
-        matchMode: state.matchMode
+        matchMode: state.matchMode,
+        lastFeature: state.lastFeature,
+        lastKey: state.lastKey,
+        lastRawValue: state.lastRawValue,
+        lastGepEventName: state.lastGepEventName,
+        recentUpdates: state.recentUpdates
       };
 
       state = createInitialState();
@@ -458,6 +557,11 @@
         pseudoMatchId: previousMatchContext.pseudoMatchId,
         effectiveMatchId: previousMatchContext.effectiveMatchId,
         matchMode: previousMatchContext.matchMode,
+        lastFeature: previousMatchContext.lastFeature,
+        lastKey: previousMatchContext.lastKey,
+        lastRawValue: previousMatchContext.lastRawValue,
+        lastGepEventName: previousMatchContext.lastGepEventName,
+        recentUpdates: previousMatchContext.recentUpdates,
         matchStartedAt: new Date().toISOString(),
         gepStatus: requiredFeaturesActive ? "connected" : state.gepStatus,
         lastEvent: "Match started"
@@ -509,7 +613,17 @@
   }
 
   function handleInfoUpdates(event) {
-    if (!event || !event.info) {
+    if (!event) {
+      return;
+    }
+
+    if (event.feature && event.key) {
+      recordGepUpdate("info", event.feature, event.key, event.value);
+      updateInfoFeature(event.feature, event.category || "", event.key, event.value);
+      return;
+    }
+
+    if (!event.info) {
       return;
     }
 
@@ -521,7 +635,10 @@
       }
 
       Object.keys(entries).forEach(function (key) {
-        updateInfoFeature(event.feature, category, key, entries[key]);
+        var feature = event.feature || category;
+
+        recordGepUpdate("info", feature, key, entries[key]);
+        updateInfoFeature(feature, category, key, entries[key]);
       });
     });
   }

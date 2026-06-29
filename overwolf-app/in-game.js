@@ -10,7 +10,14 @@
     lastEvent: "Preview mode",
     matchStartedAt: new Date().toISOString(),
     matchEnded: false,
-    gepStatus: "preview"
+    gepStatus: "preview",
+    detectedGameId: 10906,
+    detectedGameRunning: true,
+    lastFeature: "me",
+    lastKey: "health",
+    lastRawValue: "{\"health\":74}",
+    lastGepEventName: "",
+    recentUpdates: ["info:me:health"]
   };
 
   var elements = {};
@@ -24,6 +31,11 @@
     elements.health = document.getElementById("health");
     elements.weaponState = document.getElementById("weapon-state");
     elements.lastEvent = document.getElementById("last-event");
+    elements.debugGep = document.getElementById("debug-gep");
+    elements.debugGame = document.getElementById("debug-game");
+    elements.debugLast = document.getElementById("debug-last");
+    elements.debugRaw = document.getElementById("debug-raw");
+    elements.debugRecent = document.getElementById("debug-recent");
   }
 
   function render(state) {
@@ -40,6 +52,11 @@
     elements.health.textContent = state.health === null || state.health === undefined ? "--" : String(state.health);
     elements.weaponState.textContent = state.weaponState || "Weapon state unknown";
     elements.lastEvent.textContent = state.lastEvent || "No live events yet";
+    elements.debugGep.textContent = "GEP " + (state.gepStatus || "idle");
+    elements.debugGame.textContent = "Game " + (state.detectedGameId || "--") + " / " + (state.detectedGameRunning ? "run" : "off");
+    elements.debugLast.textContent = "Last " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-");
+    elements.debugRaw.textContent = "Raw " + (state.lastRawValue || "--");
+    elements.debugRecent.textContent = "Recent " + ((state.recentUpdates || []).join(" | ") || "--");
   }
 
   function subscribeToController() {
