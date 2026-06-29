@@ -7,33 +7,33 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="overlay-shell">
-    <main class="overlay-card" aria-label="BGMS Companion live overlay">
+    <main class="overlay-card" aria-label="BGMS Companion live overlay" data-i18n-aria-label="overlayAriaLabel">
       <header class="overlay-header">
         <div>
-          <p class="eyebrow">BGMS Companion</p>
-          <h1 id="match-state">Waiting for PUBG</h1>
+          <p class="eyebrow" data-i18n="overlayEyebrow">BGMS Companion</p>
+          <h1 id="match-state" data-i18n="waitingForPubg">Waiting for PUBG</h1>
         </div>
-        <div class="phase-pill" id="phase">Idle</div>
+        <div class="phase-pill" id="phase" data-i18n="idle">Idle</div>
       </header>
 
       <section class="metric-grid" aria-label="Live match metrics">
         <div class="metric">
-          <span class="metric-label">Kills</span>
+          <span class="metric-label" data-i18n="kills">Kills</span>
           <strong id="kills">0</strong>
         </div>
         <div class="metric">
-          <span class="metric-label">Alive</span>
+          <span class="metric-label" data-i18n="alive">Alive</span>
           <strong id="alive">--</strong>
         </div>
         <div class="metric">
-          <span class="metric-label">Health</span>
+          <span class="metric-label" data-i18n="health">Health</span>
           <strong id="health">--</strong>
         </div>
       </section>
 
       <section class="status-row" aria-label="Player state">
-        <span id="weapon-state">Weapon state unknown</span>
-        <span id="last-event">No live events yet</span>
+        <span id="weapon-state" data-i18n="weaponUnknown">Weapon state unknown</span>
+        <span id="last-event" data-i18n="noLiveEvents">No live events yet</span>
       </section>
 
       <section class="debug-panel" aria-label="Debug state">
@@ -45,6 +45,7 @@
       </section>
     </main>
 
+    <script src="i18n.js"></script>
     <script src="in-game.js"></script>
   </body>
 </html>

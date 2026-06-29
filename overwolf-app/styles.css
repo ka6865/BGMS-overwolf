@@ -43,6 +43,34 @@ body {
   padding: 52px 0;
 }
 
+.language-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.language-switcher button {
+  min-width: 72px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.language-switcher button.is-selected {
+  border-color: rgba(94, 227, 161, 0.55);
+  background: rgba(94, 227, 161, 0.13);
+  color: var(--mint);
+}
+
 .desktop-hero {
   display: grid;
   grid-template-columns: 92px minmax(0, 1fr);

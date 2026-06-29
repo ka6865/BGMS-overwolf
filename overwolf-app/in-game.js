@@ -22,6 +22,7 @@
 
   var elements = {};
   var unsubscribe = null;
+  var lastState = previewState;
 
   function queryElements() {
     elements.matchState = document.getElementById("match-state");
@@ -39,24 +40,27 @@
   }
 
   function render(state) {
+    var t = window.bgmsI18n.translate;
     var matchLabel = state.matchEnded
-      ? "Match ended"
+      ? t("matchEnded")
       : state.matchStartedAt
-        ? "Live match"
-        : "Waiting for PUBG";
+        ? t("liveMatch")
+        : t("waitingForPubg");
+
+    lastState = state;
 
     elements.matchState.textContent = matchLabel;
-    elements.phase.textContent = state.phase || "Idle";
+    elements.phase.textContent = state.phase || t("idle");
     elements.kills.textContent = String(state.kills || 0);
     elements.alive.textContent = state.alivePlayers === null || state.alivePlayers === undefined ? "--" : String(state.alivePlayers);
     elements.health.textContent = state.health === null || state.health === undefined ? "--" : String(state.health);
-    elements.weaponState.textContent = state.weaponState || "Weapon state unknown";
-    elements.lastEvent.textContent = state.lastEvent || "No live events yet";
-    elements.debugGep.textContent = "GEP " + (state.gepStatus || "idle");
-    elements.debugGame.textContent = "Game " + (state.detectedGameId || "--") + " / " + (state.detectedGameRunning ? "run" : "off");
-    elements.debugLast.textContent = "Last " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-");
-    elements.debugRaw.textContent = "Raw " + (state.lastRawValue || "--");
-    elements.debugRecent.textContent = "Recent " + ((state.recentUpdates || []).join(" | ") || "--");
+    elements.weaponState.textContent = state.weaponState || t("weaponUnknown");
+    elements.lastEvent.textContent = state.lastEvent || t("noLiveEvents");
+    elements.debugGep.textContent = t("gep") + " " + (state.gepStatus || "idle");
+    elements.debugGame.textContent = t("game") + " " + (state.detectedGameId || "--") + " / " + (state.detectedGameRunning ? t("run") : t("off"));
+    elements.debugLast.textContent = t("last") + " " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-");
+    elements.debugRaw.textContent = t("raw") + " " + (state.lastRawValue || "--");
+    elements.debugRecent.textContent = t("recent") + " " + ((state.recentUpdates || []).join(" | ") || "--");
   }
 
   function subscribeToController() {
@@ -77,8 +81,21 @@
   }
 
   queryElements();
+  window.bgmsI18n.applyTranslations(document);
   render(previewState);
   subscribeToController();
+
+  window.addEventListener("storage", function (event) {
+    if (event.key === "bgms_companion_language") {
+      window.bgmsI18n.applyTranslations(document);
+      render(lastState);
+    }
+  });
+
+  window.addEventListener("bgms:language-change", function () {
+    window.bgmsI18n.applyTranslations(document);
+    render(lastState);
+  });
 
   window.addEventListener("beforeunload", function () {
     if (typeof unsubscribe === "function") {

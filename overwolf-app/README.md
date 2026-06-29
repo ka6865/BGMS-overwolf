@@ -39,6 +39,10 @@ The controller keeps a single GEP listener registration and a single required-fe
 
 Roster parsing is intentionally conservative until GEP Simulator payloads are confirmed. The current parser counts alive players only when a roster item has a known `out` boolean-like value.
 
+## Localization
+
+English is the default app language for Overwolf review. Korean is available as an optional local setting from the desktop window and is stored locally in `localStorage`.
+
 ## Overwolf Review Notes
 
 BGMS owns and operates the `bgms.kr` domain, BGMS web service, backend, and processing pipeline. BGMS does not claim ownership of PUBG or KRAFTON source game data. The app uses Overwolf GEP for live overlay context and BGMS-controlled service endpoints for post-match handoff.

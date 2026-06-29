@@ -8,12 +8,18 @@
   </head>
   <body class="desktop-shell">
     <main class="desktop-page">
+      <nav class="language-switcher" aria-label="Language">
+        <span data-i18n="languageLabel">Language</span>
+        <button type="button" data-language="en" aria-pressed="true" data-i18n="languageEnglish">English</button>
+        <button type="button" data-language="ko" aria-pressed="false" data-i18n="languageKorean">Korean</button>
+      </nav>
+
       <section class="desktop-hero" aria-labelledby="app-title">
         <img src="assets/bgms-icon.svg" alt="" class="desktop-logo">
         <div>
-          <p class="eyebrow">BGMS Companion for PUBG</p>
-          <h1 id="app-title">Live match context, clean post-match handoff.</h1>
-          <p class="lede">
+          <p class="eyebrow" data-i18n="desktopEyebrow">BGMS Companion for PUBG</p>
+          <h1 id="app-title" data-i18n="desktopTitle">Live match context, clean post-match handoff.</h1>
+          <p class="lede" data-i18n="desktopLede">
             BGMS Companion shows a compact in-game status overlay and prepares a session summary for BGMS after the match ends.
           </p>
         </div>
@@ -21,25 +27,28 @@
 
       <section class="desktop-grid" aria-label="App status">
         <article class="panel">
-          <h2>Phase 1 scope</h2>
+          <h2 data-i18n="phaseScopeTitle">Phase 1 scope</h2>
           <ul class="scope-list">
-            <li>Match start and match end state</li>
-            <li>Phase, local health, weapon state</li>
-            <li>Kills, deaths, revives, killer notice</li>
-            <li>Roster-based alive player count</li>
+            <li data-i18n="phaseScopeMatch">Match start and match end state</li>
+            <li data-i18n="phaseScopeState">Phase, local health, weapon state</li>
+            <li data-i18n="phaseScopeEvents">Kills, deaths, revives, killer notice</li>
+            <li data-i18n="phaseScopeRoster">Roster-based alive player count</li>
           </ul>
         </article>
 
         <article class="panel">
-          <h2>Policy guardrails</h2>
+          <h2 data-i18n="guardrailsTitle">Policy guardrails</h2>
           <ul class="scope-list">
-            <li>No real-time damage meter</li>
-            <li>No live location or minimap</li>
-            <li>No PUBG API calls from live GEP triggers</li>
-            <li>No service role or Supabase secrets in the app</li>
+            <li data-i18n="guardrailDamage">No real-time damage meter</li>
+            <li data-i18n="guardrailLocation">No live location or minimap</li>
+            <li data-i18n="guardrailPubgApi">No PUBG API calls from live GEP triggers</li>
+            <li data-i18n="guardrailSecrets">No service role or Supabase secrets in the app</li>
           </ul>
         </article>
       </section>
     </main>
+
+    <script src="i18n.js"></script>
+    <script src="desktop.js"></script>
   </body>
 </html>
