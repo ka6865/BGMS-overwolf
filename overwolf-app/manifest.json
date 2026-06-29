@@ -7,13 +7,14 @@
     "version": "0.1.0",
     "minimum-overwolf-version": "0.170.0",
     "description": "A lightweight in-game PUBG companion overlay for live session awareness and post-match BGMS handoff.",
-    "icon": "assets/bgms-icon.svg",
-    "icon_gray": "assets/bgms-icon-gray.svg",
+    "icon": "assets/bgms-icon.png",
+    "icon_gray": "assets/bgms-icon-gray.png",
     "website": "https://bgms.kr"
   },
   "permissions": [
     "GameInfo",
-    "GameEvents"
+    "GameEvents",
+    "Hotkeys"
   ],
   "data": {
     "start_window": "background",

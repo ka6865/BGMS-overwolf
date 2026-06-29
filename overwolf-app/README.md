@@ -25,6 +25,10 @@ This folder contains the Phase 1 Overwolf app draft for BGMS review and Overwolf
 
 Open `desktop.html` or `in-game.html` in a browser to inspect the static UI. Without Overwolf APIs, the in-game window enters preview mode with sample UI state only.
 
+## OPK Packaging
+
+When building an `.opk` for Windows testing, compress the contents of `overwolf-app/` so `manifest.json` is at the root of the archive. Do not zip the parent folder as an extra top-level directory.
+
 ## Controller Notes
 
 `background.js` owns `setRequiredFeatures()`, `onInfoUpdates2`, and `onNewEvents`. It exposes `window.bgmsController` so declared windows can subscribe to state snapshots through `overwolf.windows.getMainWindow()`.
