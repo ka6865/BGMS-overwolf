@@ -57,6 +57,19 @@
       setTimeout(function () {
         window.mockGep.fireEvent("matchEnd", {});
       }, 300);
+    },
+
+    // 5. GEP 데이터 미수신 실패 시나리오 (Starting 상태에서 멈춤)
+    simulateFailure: function () {
+      console.log("Scenario: Simulating GEP connection but missing 'me' and 'roster' updates.");
+      window.mockGep.fireInfoUpdate("phase", "game_info", "phase", "starting");
+      
+      setTimeout(function () {
+        window.mockGep.fireEvent("matchStart", {});
+        window.mockGep.fireInfoUpdate("match", "match_info", "match_id", "match-mock-fail-123");
+        window.mockGep.fireInfoUpdate("match_info", "match_info", "pseudo_match_id", "pseudo-mock-fail-321");
+      }, 500);
+      // me와 roster 데이터는 의도적으로 전송하지 않아 UI에 '--' 상태가 유지됨
     }
   };
 })();
