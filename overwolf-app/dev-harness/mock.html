@@ -100,6 +100,12 @@
   <body>
     <!-- 1. 제어판 -->
     <div class="control-panel">
+      <h3>Language Settings</h3>
+      <nav class="language-switcher" aria-label="Language" style="margin-bottom: 10px; justify-content: flex-start; gap: 8px;">
+        <button type="button" data-language="en" class="btn" style="min-width: 60px; padding: 6px 10px;" data-i18n="languageEnglish">English</button>
+        <button type="button" data-language="ko" class="btn" style="min-width: 60px; padding: 6px 10px;" data-i18n="languageKorean">Korean</button>
+      </nav>
+
       <h3>Scenario Runner</h3>
       <button class="btn" onclick="mockScenarios.startMatch()">1. Start Match (Airfield)</button>
       <button class="btn" onclick="mockScenarios.addKills()">2. Trigger Kill (+1 Kill)</button>
