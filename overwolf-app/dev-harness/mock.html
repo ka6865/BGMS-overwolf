@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <title>BGMS Companion - macOS Local Dev Harness</title>
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+      body {
+        background: #0d1b18;
+        color: #eef8f2;
+        font-family: sans-serif;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      /* 컨트롤 패널 스타일 */
+      .control-panel {
+        width: 320px;
+        background: #08110f;
+        border-right: 2px solid rgba(94, 227, 161, 0.2);
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        overflow-y: auto;
+      }
+
+      .control-panel h3 {
+        margin-top: 0;
+        color: #5ee3a1;
+        border-bottom: 1px solid rgba(94, 227, 161, 0.3);
+        padding-bottom: 8px;
+      }
+
+      .btn {
+        background: rgba(94, 227, 161, 0.1);
+        border: 1px solid rgba(94, 227, 161, 0.4);
+        color: #eef8f2;
+        padding: 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: bold;
+        text-align: left;
+      }
+
+      .btn:hover {
+        background: rgba(94, 227, 161, 0.25);
+        border-color: #5ee3a1;
+      }
+
+      .slider-group {
+        display: flex;
+        flex-direction: column;
+        gap: 5px;
+      }
+
+      /* 뷰포트 스타일 */
+      .viewports {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        gap: 20px;
+        overflow-y: auto;
+      }
+
+      .window-wrapper {
+        border: 1px dashed rgba(94, 227, 161, 0.3);
+        border-radius: 8px;
+        padding: 15px;
+        background: rgba(12, 25, 23, 0.5);
+        position: relative;
+      }
+
+      .window-wrapper::before {
+        content: attr(data-window-name);
+        position: absolute;
+        top: -10px;
+        left: 15px;
+        background: #0d1b18;
+        padding: 0 8px;
+        font-size: 11px;
+        color: #5ee3a1;
+        font-weight: bold;
+      }
+
+      /* 인게임 오버레이 전용 투명 컨테이너 시뮬레이션 */
+      .ingame-container {
+        background: url("assets/bgms-pattern.svg");
+        min-height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- 1. 제어판 -->
+    <div class="control-panel">
+      <h3>Scenario Runner</h3>
+      <button class="btn" onclick="mockScenarios.startMatch()">1. Start Match (Airfield)</button>
+      <button class="btn" onclick="mockScenarios.addKills()">2. Trigger Kill (+1 Kill)</button>
+      <button class="btn" onclick="mockScenarios.matchEndDuplicate()">3. Trigger Match End (Duplicate Check)</button>
+
+      <h3>Interactive Controls</h3>
+      <div class="slider-group">
+        <label>Modify Health (<span id="health-val">100</span>%)</label>
+        <input type="range" min="0" max="100" value="100" oninput="updateMockHealth(this.value)">
+      </div>
+
+      <button class="btn" onclick="mockGep.triggerHotkey('toggle_overlay')">Hotkey: Toggle Overlay</button>
+      <button class="btn" onclick="mockGep.triggerHotkey('open_desktop')">Hotkey: Toggle Desktop</button>
+    </div>
+
+    <!-- 2. 오버레이 및 대시보드 화면 -->
+    <div class="viewports">
+      <div class="window-wrapper ingame-container" data-window-name="In-Game Overlay Window">
+        <!-- in-game.html 본체 구조를 가상으로 배치 -->
+        <div class="overlay-card" id="in-game-root">
+          <div class="mini-hud">
+            <span class="mini-brand" data-i18n="overlayEyebrow">BGMS Companion</span>
+            <span class="mini-phase" id="phase">Idle</span>
+            <div class="mini-item" id="alive-item">
+              <span>Alive:</span> <strong id="alive">--</strong>
+            </div>
+            <div class="mini-item" id="health-item">
+              <span>HP:</span> <strong id="health">--</strong>
+            </div>
+            <div class="mini-item">
+              <span data-i18n="kills">Kills</span>: <strong id="kills">0</strong>
+            </div>
+          </div>
+          <div class="mini-status">
+            <span id="match-state">Waiting for PUBG</span>
+            <span id="weapon-state">Weapon state unknown</span>
+            <span id="last-event">No live events yet</span>
+          </div>
+          <!-- 디버그 패널 -->
+          <div class="debug-panel" id="debug-panel">
+            <span id="debug-gep">GEP idle</span>
+            <span id="debug-game">Game -- / off</span>
+            <span id="debug-last">Last -:-</span>
+            <span id="debug-raw">Raw --</span>
+            <span id="debug-recent">Recent --</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="window-wrapper" data-window-name="Desktop Diagnostics Window">
+        <!-- desktop.html 구조를 가상으로 배치 -->
+        <section class="desktop-hero" style="border-bottom: 0; padding-bottom: 10px;">
+          <div>
+            <p class="eyebrow" data-i18n="desktopEyebrow">BGMS Companion for PUBG</p>
+            <h1 id="app-title" data-i18n="desktopTitle" style="font-size: 28px; line-height: 1.25;">Live match context, clean post-match handoff.</h1>
+            <p class="lede" data-i18n="desktopLede" style="font-size: 13px;">
+              BGMS Companion shows a compact in-game status overlay and prepares a session summary.
+            </p>
+          </div>
+        </section>
+
+        <article class="panel diagnostics-panel" style="min-height: auto;">
+          <h2 data-i18n="diagnosticsTitle">Live diagnostics</h2>
+          <dl class="diagnostics-list">
+            <div>
+              <dt data-i18n="gepStatusLabel">GEP status</dt>
+              <dd id="desktop-gep-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gameStatusLabel">Game</dt>
+              <dd id="desktop-game-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="lastEventLabel">Last event</dt>
+              <dd id="desktop-last-event">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="recentUpdatesLabel">Recent updates</dt>
+              <dd id="desktop-recent-updates">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="seenFeaturesLabel">Seen features</dt>
+              <dd id="desktop-seen-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="supportedFeaturesLabel">Supported features</dt>
+              <dd id="desktop-supported-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="missingUpdatesLabel">Missing updates</dt>
+              <dd id="desktop-missing-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="requiredResultLabel">Required result</dt>
+              <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
+            </div>
+          </dl>
+        </article>
+      </div>
+    </div>
+
+    <!-- 의존성 순차 로드 -->
+    <script src="mock-overwolf.js"></script>
+    <script src="mock-scenarios.js"></script>
+    <script src="../i18n.js"></script>
+    <script src="../background.js"></script>
+    <script src="../in-game.js"></script>
+    <script src="../desktop.js"></script>
+
+    <script>
+      function updateMockHealth(val) {
+        document.getElementById('health-val').textContent = val;
+        mockScenarios.updateHealth(Number(val));
+      }
+    </script>
+  </body>
+</html>
