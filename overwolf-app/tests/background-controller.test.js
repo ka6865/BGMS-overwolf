@@ -440,3 +440,29 @@ test("openHotkeySettings: Overwolf 핫키 설정 화면을 연다", () => {
   assert.equal(urls.length, 1);
   assert.equal(urls[0], "overwolf://settings/hotkeys");
 });
+
+test("openExternalLink: 화이트리스트 키만 열고 임의 URL은 거부한다", () => {
+  const sandbox = createSandbox();
+
+  const community = sandbox.bgmsController.openExternalLink("community");
+  const discord = sandbox.bgmsController.openExternalLink("discord");
+
+  assert.equal(community, "https://bgms.kr/board");
+  assert.equal(discord, "https://discord.gg/T97MR78awb");
+
+  // 화이트리스트 밖의 값은 아무것도 열지 않는다.
+  assert.equal(sandbox.bgmsController.openExternalLink("evil"), null);
+  assert.equal(sandbox.bgmsController.openExternalLink("https://attacker.example"), null);
+  assert.equal(sandbox.bgmsController.openExternalLink(""), null);
+  assert.equal(sandbox.bgmsController.openExternalLink(undefined), null);
+
+  const opened = sandbox.mockGep.openedUrls();
+
+  assert.equal(opened.length, 2, "허용된 두 건만 열려야 한다");
+  opened.forEach((url) => {
+    assert.ok(
+      url === "https://bgms.kr/board" || url === "https://discord.gg/T97MR78awb",
+      "예상 밖의 URL이 열렸다: " + url
+    );
+  });
+});

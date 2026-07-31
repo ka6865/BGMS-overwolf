@@ -29,6 +29,14 @@
   var SESSION_ENDPOINT = window.bgmsDevEndpoint || "https://bgms.kr/api/overwolf/session";
   // 사용자가 데스크탑 창에서 세션 기록을 열 때 사용하는 웹 경로.
   var SESSION_WEB_BASE = window.bgmsDevWebBase || "https://bgms.kr/overwolf/sessions";
+  /*
+   * 앱에서 열 수 있는 외부 링크. 화이트리스트로 두어 임의 URL 이 열리지 않게 한다.
+   * community 는 BGMS 게시판, discord 는 공식 서버다.
+   */
+  var EXTERNAL_LINKS = {
+    community: "https://bgms.kr/board",
+    discord: "https://discord.gg/T97MR78awb"
+  };
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
   var QUEUE_TICK_MS = 30000;
 
@@ -769,6 +777,22 @@
       overwolf.utils.openUrlInDefaultBrowser("overwolf://settings/hotkeys");
 
       return true;
+    },
+    /*
+     * 지원/피드백 링크를 기본 브라우저로 연다.
+     * 공식 Best Practices 가 in-app 피드백 경로를 권한다.
+     * 화이트리스트 키만 받아 임의 URL 이 열리지 않게 한다.
+     */
+    openExternalLink: function (key) {
+      var url = EXTERNAL_LINKS[key];
+
+      if (!url || !hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
+        return null;
+      }
+
+      overwolf.utils.openUrlInDefaultBrowser(url);
+
+      return url;
     },
     /*
      * BGMS 웹의 세션 기록 화면을 기본 브라우저로 연다.

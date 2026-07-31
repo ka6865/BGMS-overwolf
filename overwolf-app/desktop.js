@@ -419,6 +419,25 @@
     controller.getAssignedHotkeys(render);
   }
 
+  /* 지원/피드백 링크. 컨트롤러의 화이트리스트 키만 넘긴다. */
+  function bindFooterLinks() {
+    [["open-community", "community"], ["open-discord", "discord"]].forEach(function (pair) {
+      var button = document.getElementById(pair[0]);
+
+      if (!button) {
+        return;
+      }
+
+      button.addEventListener("click", function () {
+        var controller = getController();
+
+        if (controller && typeof controller.openExternalLink === "function") {
+          controller.openExternalLink(pair[1]);
+        }
+      });
+    });
+  }
+
   function bindHotkeyControls() {
     var editButton = document.getElementById("edit-hotkeys");
 
@@ -477,6 +496,7 @@
   bindDesktopClose();
   bindRefreshButton();
   bindHotkeyControls();
+  bindFooterLinks();
   syncLanguageButtons();
   syncSettingsControls();
   syncServiceSettingsControls();
