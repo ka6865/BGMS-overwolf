@@ -1,22 +1,38 @@
+/*
+ * BGMS Companion - background controller
+ *
+ * 역할:
+ *  - PUBG 실행 감지 (game id -> class id 환산)
+ *  - GEP 구독(setRequiredFeatures) 및 재시도
+ *  - GEP payload를 gep-state.js 리듀서에 위임
+ *  - 오버레이/데스크탑 창 제어와 상태 브로드캐스트
+ *
+ * 공식 문서 기준:
+ *  - setRequiredFeatures는 background controller에서만 호출하고 success까지 재시도한다.
+ *  - onInfoUpdates2/onNewEvents는 중복 리스너 방지를 위해 remove 후 add한다.
+ *  - GEP 장애는 사용자에게 알린다(game events status 엔드포인트).
+ */
 (function () {
   "use strict";
 
-  var PUBG_GAME_ID = 10906;
+  var gepState = window.bgmsGepState;
+
   var IN_GAME_WINDOW = "in_game";
   var DESKTOP_WINDOW = "desktop";
+
+  // 서버 수신 엔드포인트가 승인/구현될 때까지 비워 둔다. 비어 있으면 전송을 시도하지 않는다.
   var SESSION_ENDPOINT = "";
-  var REQUIRED_FEATURES = [
-    "match",
-    "phase",
-    "kill",
-    "death",
-    "revived",
-    "killer",
-    "roster",
-    "me"
-  ];
+
+  var REQUIRED_FEATURES = gepState.REQUIRED_FEATURES;
   var MAX_FEATURE_ATTEMPTS = 8;
-  var RETRY_DELAY_MS = 1500;
+  var RETRY_DELAY_MS = 3000;
+  var MAX_SUMMARY_ATTEMPTS = 3;
+  var SUMMARY_RETRY_DELAY_MS = 5000;
+  var STATUS_ENDPOINT_TEMPLATE = "https://game-events-status.overwolf.com/{gameId}_prod.json";
+
+  var OVERLAY_WIDTH = 348;
+  var OVERLAY_MINI_HEIGHT = 78;
+  var OVERLAY_DEBUG_HEIGHT = 236;
 
   var overlayVisible = false;
   var pubgRunning = false;
@@ -25,53 +41,38 @@
   var requiredFeaturesActive = false;
   var requiredFeaturesInFlight = false;
   var subscribers = [];
+  var lastGameInfo = null;
+  var desktopVisible = false;
+  var desktopDismissed = false;
+  var appVersion = "0.0.0";
+  var snapshotTimer = null;
 
-  var state = createInitialState();
+  var state = gepState.createInitialState();
 
-  function createInitialState() {
-    return {
-      sessionId: createSessionId(),
-      matchId: "",
-      pseudoMatchId: "",
-      effectiveMatchId: "",
-      matchMode: "",
-      phase: "Idle",
-      kills: 0,
-      deaths: 0,
-      revives: 0,
-      roster: {},
-      alivePlayers: null,
-      health: null,
-      weaponState: "",
-      lastEvent: "No live events yet",
-      matchStartedAt: null,
-      matchEnded: false,
-      summarySent: false,
-      gepStatus: "idle",
-      detectedGameId: null,
-      detectedGameRunning: false,
-      lastFeature: "",
-      lastKey: "",
-      lastRawValue: "",
-      lastGepEventName: "",
-      recentUpdates: []
-    };
-  }
+  var infoUpdatesListener = function (event) {
+    setState(gepState.reduceInfoUpdatesEvent(state, event));
+  };
 
-  function createSessionId() {
-    if (window.crypto && window.crypto.randomUUID) {
-      return window.crypto.randomUUID();
+  var newEventsListener = function (event) {
+    var nextState = gepState.reduceNewEventsEvent(state, event);
+
+    setState(nextState);
+
+    if (nextState.summaryReady && !nextState.summarySent) {
+      sendSessionSummary(1);
     }
+  };
 
-    return "bgms-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+  var gepErrorListener = function (event) {
+    setState(gepState.reduceGepError(state, event));
+  };
+
+  function hasBaseOverwolfApi() {
+    return typeof overwolf !== "undefined" && overwolf.windows && overwolf.games;
   }
 
-  function hasOverwolfApi() {
-    return typeof overwolf !== "undefined" && overwolf.windows && overwolf.games && overwolf.games.events;
-  }
-
-  function isPubgGameInfo(gameInfo) {
-    return Boolean(gameInfo && gameInfo.isRunning && gameInfo.id === PUBG_GAME_ID);
+  function hasGepApi() {
+    return hasBaseOverwolfApi() && overwolf.games.events;
   }
 
   function cloneState() {
@@ -91,12 +92,19 @@
     });
   }
 
-  function setState(partial) {
+  function setState(nextState) {
+    state = nextState;
+    notifySubscribers();
+  }
+
+  function patchState(partial) {
+    var nextState = JSON.parse(JSON.stringify(state));
+
     Object.keys(partial).forEach(function (key) {
-      state[key] = partial[key];
+      nextState[key] = partial[key];
     });
 
-    notifySubscribers();
+    setState(nextState);
   }
 
   function getCurrentWindow(callback) {
@@ -111,7 +119,11 @@
         return;
       }
 
-      overwolf.windows.restore(result.window.id, function () {});
+      overwolf.windows.restore(result.window.id, function () {
+        if (overwolf.windows.bringToFront) {
+          overwolf.windows.bringToFront(result.window.id, function () {});
+        }
+      });
     });
   }
 
@@ -130,6 +142,7 @@
 
     if (overlayVisible) {
       showWindow(IN_GAME_WINDOW);
+      applyOverlaySettings();
       return;
     }
 
@@ -137,44 +150,145 @@
   }
 
   function handleGameInfo(gameInfo) {
-    if (isPubgGameInfo(gameInfo)) {
+    var classId = gepState.resolveClassId(gameInfo);
+
+    if (gepState.isPubgGameInfo(gameInfo)) {
       pubgRunning = true;
-      setState({
-        detectedGameId: gameInfo.id,
+      lastGameInfo = gameInfo;
+      patchState({
+        detectedGameId: gameInfo.id || null,
+        detectedClassId: classId,
         detectedGameRunning: true
       });
+      fetchServiceStatus(classId);
       ensureGepSubscription();
       setOverlayVisible(true);
       return;
     }
 
     if (gameInfo) {
-      setState({
-        detectedGameId: gameInfo.id || null,
-        detectedGameRunning: Boolean(gameInfo.isRunning)
-      });
+      lastGameInfo = gameInfo;
     }
-    resetGepRuntimeState();
+
+    resetGepRuntimeState(gameInfo ? gameInfo.id || null : null, classId, Boolean(gameInfo && gameInfo.isRunning));
     setOverlayVisible(false);
   }
 
-  function resetGepRuntimeState() {
+  function resetGepRuntimeState(detectedGameId, detectedClassId, detectedGameRunning) {
     pubgRunning = false;
     gepAttemptToken += 1;
     requiredFeaturesActive = false;
     requiredFeaturesInFlight = false;
 
-    state = Object.assign(createInitialState(), {
-      detectedGameId: state.detectedGameId,
-      detectedGameRunning: state.detectedGameRunning,
+    if (snapshotTimer) {
+      window.clearTimeout(snapshotTimer);
+      snapshotTimer = null;
+    }
+
+    setState(gepState.createInitialState({
+      detectedGameId: detectedGameId,
+      detectedClassId: detectedClassId,
+      detectedGameRunning: detectedGameRunning,
+      serviceStatusState: state.serviceStatusState,
+      serviceStatusMessage: state.serviceStatusMessage,
       gepStatus: "idle",
       lastEvent: "Waiting for PUBG"
-    });
-    notifySubscribers();
+    }));
   }
 
   function openDesktopWindow() {
+    desktopVisible = true;
+    desktopDismissed = false;
     showWindow(DESKTOP_WINDOW);
+  }
+
+  function closeDesktopWindow() {
+    desktopVisible = false;
+    desktopDismissed = true;
+    closeWindow(DESKTOP_WINDOW);
+  }
+
+  function toggleDesktopWindow() {
+    if (desktopVisible) {
+      closeDesktopWindow();
+      return;
+    }
+
+    openDesktopWindow();
+  }
+
+  function getOverlaySettings() {
+    if (!window.bgmsI18n || typeof window.bgmsI18n.getOverlaySettings !== "function") {
+      return {
+        mode: "mini",
+        opacity: 1,
+        position: "top-left"
+      };
+    }
+
+    return window.bgmsI18n.getOverlaySettings();
+  }
+
+  function getGameWidth() {
+    if (!lastGameInfo) {
+      return 1920;
+    }
+
+    return lastGameInfo.logicalWidth || lastGameInfo.width || lastGameInfo.screenWidth || 1920;
+  }
+
+  function getOverlayPosition(position) {
+    var width = getGameWidth();
+
+    if (position === "top-center") {
+      return {
+        left: Math.max(24, Math.round((width - OVERLAY_WIDTH) / 2)),
+        top: 28
+      };
+    }
+
+    if (position === "top-right") {
+      return {
+        left: Math.max(24, width - OVERLAY_WIDTH - 24),
+        top: 28
+      };
+    }
+
+    return {
+      left: 24,
+      top: 28
+    };
+  }
+
+  function applyOverlaySettings(settings) {
+    var nextSettings = settings || getOverlaySettings();
+
+    if (!overwolf.windows.getWindow || !overwolf.windows.changePosition) {
+      return;
+    }
+
+    overwolf.windows.getWindow(IN_GAME_WINDOW, function (result) {
+      var position = getOverlayPosition(nextSettings.position);
+      var nextHeight = nextSettings.mode === "debug" ? OVERLAY_DEBUG_HEIGHT : OVERLAY_MINI_HEIGHT;
+
+      if (!result || result.status !== "success") {
+        return;
+      }
+
+      if (!overwolf.windows.changeSize) {
+        overwolf.windows.changePosition(result.window.id, position.left, position.top, function () {});
+        return;
+      }
+
+      overwolf.windows.changeSize({
+        window_id: result.window.id,
+        width: OVERLAY_WIDTH,
+        height: nextHeight,
+        auto_dpi_resize: true
+      }, function () {
+        overwolf.windows.changePosition(result.window.id, position.left, position.top, function () {});
+      });
+    });
   }
 
   function registerHotkey() {
@@ -186,6 +300,10 @@
       if (event && event.name === "toggle_overlay") {
         setOverlayVisible(!overlayVisible);
       }
+
+      if (event && event.name === "open_desktop") {
+        toggleDesktopWindow();
+      }
     });
   }
 
@@ -193,7 +311,7 @@
     overwolf.games.getRunningGameInfo(function (gameInfo) {
       handleGameInfo(gameInfo);
 
-      if (!isPubgGameInfo(gameInfo)) {
+      if (!gepState.isPubgGameInfo(gameInfo) && !desktopDismissed) {
         openDesktopWindow();
       }
     });
@@ -203,15 +321,39 @@
     });
   }
 
+  // 공식 권장: 리스너는 remove 후 add 해서 중복 등록을 막는다.
+  function bindGepListeners() {
+    var events = overwolf.games.events;
+
+    if (events.onInfoUpdates2.removeListener) {
+      events.onInfoUpdates2.removeListener(infoUpdatesListener);
+    }
+
+    if (events.onNewEvents.removeListener) {
+      events.onNewEvents.removeListener(newEventsListener);
+    }
+
+    if (events.onError && events.onError.removeListener) {
+      events.onError.removeListener(gepErrorListener);
+    }
+
+    events.onInfoUpdates2.addListener(infoUpdatesListener);
+    events.onNewEvents.addListener(newEventsListener);
+
+    if (events.onError) {
+      events.onError.addListener(gepErrorListener);
+    }
+
+    gepListenersRegistered = true;
+  }
+
   function ensureGepSubscription() {
-    if (!hasOverwolfApi()) {
+    if (!hasGepApi()) {
       return;
     }
 
     if (!gepListenersRegistered) {
-      overwolf.games.events.onInfoUpdates2.addListener(handleInfoUpdates);
-      overwolf.games.events.onNewEvents.addListener(handleNewEvents);
-      gepListenersRegistered = true;
+      bindGepListeners();
     }
 
     if (requiredFeaturesActive || requiredFeaturesInFlight) {
@@ -228,34 +370,43 @@
     }
 
     requiredFeaturesInFlight = true;
-    setState({
+    patchState({
       gepStatus: "connecting",
       lastEvent: "Connecting to PUBG live events"
     });
 
     overwolf.games.events.setRequiredFeatures(REQUIRED_FEATURES, function (result) {
+      var supported = result && Array.isArray(result.supportedFeatures) ? result.supportedFeatures : [];
+      var succeeded = Boolean(result && (result.success === true || result.status === "success")) && supported.length > 0;
+
       if (!pubgRunning || token !== gepAttemptToken) {
         requiredFeaturesActive = false;
         requiredFeaturesInFlight = false;
         return;
       }
 
-      if (result && result.status === "success") {
+      if (succeeded) {
         requiredFeaturesActive = true;
         requiredFeaturesInFlight = false;
-        setState({
+        patchState({
           gepStatus: "connected",
-          lastEvent: "Connected to PUBG live events"
+          gepErrorReason: "",
+          lastEvent: "Connected, syncing live data",
+          supportedFeatures: supported,
+          lastRequiredFeaturesResult: gepState.summarizeValue(result)
         });
+        refreshGepInfoSnapshot();
+        snapshotTimer = window.setTimeout(refreshGepInfoSnapshot, 1500);
         return;
       }
 
       if (attempt >= MAX_FEATURE_ATTEMPTS) {
         requiredFeaturesActive = false;
         requiredFeaturesInFlight = false;
-        setState({
+        patchState({
           gepStatus: "unavailable",
-          lastEvent: "Live events unavailable"
+          lastEvent: "Live events unavailable",
+          lastRequiredFeaturesResult: gepState.summarizeValue(result)
         });
         return;
       }
@@ -266,433 +417,180 @@
     });
   }
 
-  function safeParse(value) {
-    if (typeof value !== "string" || value.length === 0) {
-      return value;
-    }
-
-    try {
-      return JSON.parse(value);
-    } catch (_error) {
-      return value;
-    }
-  }
-
-  function normalizeNumber(value) {
-    if (value && typeof value === "object") {
-      if (typeof value.health !== "undefined") {
-        return normalizeNumber(value.health);
-      }
-
-      if (typeof value.value !== "undefined") {
-        return normalizeNumber(value.value);
-      }
-    }
-
-    var parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
-  }
-
-  function normalizeBoolean(value) {
-    if (value === true || value === false) {
-      return value;
-    }
-
-    if (typeof value === "string") {
-      var lowerValue = value.toLowerCase();
-
-      if (lowerValue === "true") {
-        return true;
-      }
-
-      if (lowerValue === "false") {
-        return false;
-      }
-    }
-
-    return null;
-  }
-
-  function getStringValue(value) {
-    if (value === null || value === undefined) {
-      return "";
-    }
-
-    return String(value);
-  }
-
-  function summarizeValue(value) {
-    var summary = "";
-
-    if (value === null || value === undefined) {
-      return "";
-    }
-
-    if (typeof value === "string") {
-      summary = value;
-    } else {
-      try {
-        summary = JSON.stringify(value);
-      } catch (_error) {
-        summary = String(value);
-      }
-    }
-
-    return summary.length > 80 ? summary.slice(0, 77) + "..." : summary;
-  }
-
-  function recordGepUpdate(kind, feature, key, rawValue) {
-    var label = [kind, feature || "-", key || "-"].join(":");
-    var recentUpdates = [label].concat(state.recentUpdates || []).slice(0, 4);
-
-    setState({
-      lastFeature: getStringValue(feature),
-      lastKey: getStringValue(key),
-      lastRawValue: summarizeValue(rawValue),
-      recentUpdates: recentUpdates
-    });
-  }
-
-  function updateInfoFeature(feature, category, key, rawValue) {
-    var value = safeParse(rawValue);
-    var normalizedKey = getStringValue(key);
-
-    if (normalizedKey === "phase") {
-      setState({
-        phase: getStringValue(value) || "Unknown",
-        lastEvent: "Phase changed to " + (getStringValue(value) || "Unknown")
-      });
+  /*
+   * getInfo는 현재 세션의 info snapshot을 준다.
+   * 공식 GetInfoResult는 res에 담기지만 클라이언트 버전에 따라 info로 오는 경우도 있어 둘 다 처리한다.
+   */
+  function refreshGepInfoSnapshot() {
+    if (!hasGepApi() || typeof overwolf.games.events.getInfo !== "function") {
       return;
     }
 
-    if (feature === "match" || normalizedKey === "match_id" || normalizedKey === "pseudo_match_id" || normalizedKey === "mode") {
-      updateMatchInfo(category, key, value);
-      return;
-    }
+    overwolf.games.events.getInfo(function (result) {
+      var succeeded = Boolean(result && (result.success === true || result.status === "success"));
+      var payloads;
 
-    if (feature === "kill" || normalizedKey === "kills" || normalizedKey === "kill") {
-      updateKillInfo(key, value);
-      return;
-    }
-
-    if (feature === "roster" || normalizedKey.indexOf("roster_") === 0) {
-      updateRosterInfo(key, value);
-      return;
-    }
-
-    if (feature === "me" || normalizedKey === "health" || normalizedKey === "hp" || normalizedKey === "weaponState" || normalizedKey === "weapon_state" || normalizedKey === "weapon") {
-      updateMeInfo(key, value);
-    }
-  }
-
-  function updateMatchInfo(_category, key, value) {
-    if (key === "match_id") {
-      var matchId = getStringValue(value);
-
-      setState({
-        matchId: matchId,
-        effectiveMatchId: matchId || state.pseudoMatchId,
-        lastEvent: "Match ID received"
-      });
-      return;
-    }
-
-    if (key === "pseudo_match_id") {
-      var pseudoMatchId = getStringValue(value);
-
-      setState({
-        pseudoMatchId: pseudoMatchId,
-        effectiveMatchId: state.matchId || pseudoMatchId,
-        lastEvent: "Pseudo match ID received"
-      });
-      return;
-    }
-
-    if (key === "mode") {
-      setState({
-        matchMode: getStringValue(value),
-        lastEvent: "Mode: " + getStringValue(value)
-      });
-    }
-  }
-
-  function updateKillInfo(key, value) {
-    if (key !== "kills" && key !== "kill") {
-      return;
-    }
-
-    var nextKills = normalizeNumber(value);
-    if (nextKills !== null) {
-      setState({
-        kills: nextKills,
-        lastEvent: "Kills updated"
-      });
-    }
-  }
-
-  function updateRosterInfo(key, value) {
-    var roster = Object.assign({}, state.roster);
-
-    if (value === null) {
-      delete roster[key];
-      setState({
-        roster: roster,
-        alivePlayers: calculateAlivePlayers(roster),
-        lastEvent: "Roster update received"
-      });
-      return;
-    }
-
-    if (!value || typeof value !== "object") {
-      setState({
-        lastEvent: "Roster update received"
-      });
-      return;
-    }
-
-    roster[key] = value;
-    setState({
-      roster: roster,
-      alivePlayers: calculateAlivePlayers(roster),
-      lastEvent: "Roster update received"
-    });
-  }
-
-  function calculateAlivePlayers(roster) {
-    var knownAlive = 0;
-    var knownStatusCount = 0;
-
-    Object.keys(roster).forEach(function (rosterKey) {
-      var player = roster[rosterKey];
-
-      if (!player || typeof player !== "object") {
+      if (!succeeded) {
         return;
       }
 
-      var out = normalizeBoolean(player.out);
+      payloads = [gepState.safeParse(result.res), gepState.safeParse(result.info)];
 
-      if (out === null) {
+      payloads.forEach(function (payload) {
+        if (!payload || typeof payload !== "object") {
+          return;
+        }
+
+        setState(gepState.reduceInfoUpdatesEvent(state, {
+          info: payload
+        }));
+      });
+    });
+  }
+
+  /*
+   * 공식 game events status 엔드포인트로 PUBG GEP 서비스 상태를 확인한다.
+   * 실패하면 조용히 무시한다(진단 보조 기능이므로 앱 동작을 막지 않는다).
+   */
+  function fetchServiceStatus(classId) {
+    var gameId = classId || gepState.PUBG_CLASS_IDS[0];
+    var url = STATUS_ENDPOINT_TEMPLATE.replace("{gameId}", String(gameId));
+
+    if (!window.fetch) {
+      return;
+    }
+
+    window.fetch(url, {
+      method: "GET"
+    }).then(function (response) {
+      if (!response.ok) {
+        return null;
+      }
+
+      return response.json();
+    }).then(function (payload) {
+      if (!payload) {
         return;
       }
 
-      knownStatusCount += 1;
-
-      if (out === false) {
-        knownAlive += 1;
-      }
-    });
-
-    return knownStatusCount === 0 ? null : knownAlive;
-  }
-
-  function updateMeInfo(key, value) {
-    if (key === "health" || key === "hp") {
-      var nextHealth = normalizeNumber(value);
-
-      if (nextHealth !== null) {
-        setState({
-          health: Math.round(nextHealth)
-        });
-      }
-
+      setState(gepState.reduceServiceStatus(state, payload));
+    }).catch(function () {
       return;
-    }
-
-    if (key === "weaponState" || key === "weapon_state" || key === "weapon") {
-      setState({
-        weaponState: formatWeaponState(value)
-      });
-    }
-  }
-
-  function formatWeaponState(value) {
-    if (!value || typeof value !== "object") {
-      return getStringValue(value);
-    }
-
-    var weaponName = getStringValue(value.name);
-    var equipped = normalizeBoolean(value.equipped);
-    var count = normalizeNumber(value.count);
-    var parts = [];
-
-    if (weaponName) {
-      parts.push(weaponName);
-    }
-
-    if (equipped === true) {
-      parts.push("equipped");
-    } else if (equipped === false) {
-      parts.push("holstered");
-    }
-
-    if (count !== null) {
-      parts.push("x" + String(count));
-    }
-
-    return parts.join(" ").trim();
-  }
-
-  function handleEvent(eventName, rawData) {
-    recordGepUpdate("event", "", eventName, rawData);
-    setState({
-      lastGepEventName: getStringValue(eventName)
-    });
-
-    if (eventName === "matchStart") {
-      var previousMatchContext = {
-        matchId: state.matchId,
-        pseudoMatchId: state.pseudoMatchId,
-        effectiveMatchId: state.effectiveMatchId,
-        matchMode: state.matchMode,
-        lastFeature: state.lastFeature,
-        lastKey: state.lastKey,
-        lastRawValue: state.lastRawValue,
-        lastGepEventName: state.lastGepEventName,
-        recentUpdates: state.recentUpdates
-      };
-
-      state = createInitialState();
-      setState({
-        matchId: previousMatchContext.matchId,
-        pseudoMatchId: previousMatchContext.pseudoMatchId,
-        effectiveMatchId: previousMatchContext.effectiveMatchId,
-        matchMode: previousMatchContext.matchMode,
-        lastFeature: previousMatchContext.lastFeature,
-        lastKey: previousMatchContext.lastKey,
-        lastRawValue: previousMatchContext.lastRawValue,
-        lastGepEventName: previousMatchContext.lastGepEventName,
-        recentUpdates: previousMatchContext.recentUpdates,
-        matchStartedAt: new Date().toISOString(),
-        gepStatus: requiredFeaturesActive ? "connected" : state.gepStatus,
-        lastEvent: "Match started"
-      });
-      return;
-    }
-
-    if (eventName === "matchEnd") {
-      setState({
-        matchEnded: true,
-        lastEvent: "Match ended"
-      });
-      sendSessionSummaryOnce();
-      return;
-    }
-
-    if (eventName === "kill") {
-      setState({
-        kills: state.kills + 1,
-        lastEvent: "Kill confirmed"
-      });
-      return;
-    }
-
-    if (eventName === "death") {
-      setState({
-        deaths: state.deaths + 1,
-        lastEvent: "You died"
-      });
-      return;
-    }
-
-    if (eventName === "revived") {
-      setState({
-        revives: state.revives + 1,
-        lastEvent: "You were revived"
-      });
-      return;
-    }
-
-    if (eventName === "killer") {
-      var killerData = safeParse(rawData);
-      var killerName = killerData && killerData.killer_name ? killerData.killer_name : "killer identified";
-
-      setState({
-        lastEvent: "Last killer: " + killerName
-      });
-    }
-  }
-
-  function handleInfoUpdates(event) {
-    if (!event) {
-      return;
-    }
-
-    if (event.feature && event.key) {
-      recordGepUpdate("info", event.feature, event.key, event.value);
-      updateInfoFeature(event.feature, event.category || "", event.key, event.value);
-      return;
-    }
-
-    if (!event.info) {
-      return;
-    }
-
-    Object.keys(event.info).forEach(function (category) {
-      var entries = event.info[category];
-
-      if (!entries || typeof entries !== "object") {
-        return;
-      }
-
-      Object.keys(entries).forEach(function (key) {
-        var feature = event.feature || category;
-
-        recordGepUpdate("info", feature, key, entries[key]);
-        updateInfoFeature(feature, category, key, entries[key]);
-      });
     });
   }
 
-  function handleNewEvents(event) {
-    if (!event || !Array.isArray(event.events)) {
+  function readAppVersion() {
+    if (!hasBaseOverwolfApi() || !overwolf.extensions || !overwolf.extensions.current) {
       return;
     }
 
-    event.events.forEach(function (entry) {
-      if (entry && entry.name) {
-        handleEvent(entry.name, entry.data);
+    overwolf.extensions.current.getManifest(function (manifest) {
+      if (manifest && manifest.meta && manifest.meta.version) {
+        appVersion = String(manifest.meta.version);
       }
     });
   }
 
-  function sendSessionSummaryOnce() {
-    if (!SESSION_ENDPOINT || state.summarySent) {
+  /*
+   * Overwolf 클라이언트 언어를 참고해 기본 언어를 정한다.
+   * 공식 API: overwolf.settings.language.get(callback) -> {language: "en", success: true}
+   * 사용자가 앱에서 언어를 직접 고른 적이 있으면 그 선택을 덮어쓰지 않는다.
+   * 기본값은 영어이고 한국어는 optional localization이다.
+   */
+  function applyClientLanguage() {
+    if (!hasBaseOverwolfApi() || !overwolf.settings || !overwolf.settings.language) {
       return;
     }
 
-    state.summarySent = true;
-    notifySubscribers();
+    if (!window.bgmsI18n || typeof window.bgmsI18n.hasStoredLanguage !== "function") {
+      return;
+    }
+
+    if (window.bgmsI18n.hasStoredLanguage()) {
+      return;
+    }
+
+    overwolf.settings.language.get(function (result) {
+      var language = result && result.language ? String(result.language).toLowerCase() : "";
+
+      if (language.indexOf("ko") === 0) {
+        window.bgmsI18n.setLanguage("ko");
+      }
+    });
+  }
+
+  function sendSessionSummary(attempt) {
+    var payload;
+
+    if (!SESSION_ENDPOINT) {
+      patchState({
+        summaryReady: false,
+        lastEvent: "Session summary ready (handoff disabled)"
+      });
+      return;
+    }
+
+    if (state.summarySent || !window.fetch) {
+      return;
+    }
+
+    payload = gepState.buildSessionSummary(state, {
+      version: appVersion,
+      overwolf_game_id: state.detectedGameId,
+      overwolf_class_id: state.detectedClassId
+    });
+
+    patchState({
+      summarySent: true,
+      summaryReady: false,
+      summaryAttempts: attempt
+    });
 
     window.fetch(SESSION_ENDPOINT, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "X-BGMS-Session-Id": payload.session_id
       },
-      body: JSON.stringify({
-        session_id: state.sessionId,
-        match_id: state.matchId || null,
-        pseudo_match_id: state.pseudoMatchId || null,
-        gep_summary: {
-          effective_match_id: state.effectiveMatchId || null,
-          match_mode: state.matchMode || null,
-          phase: state.phase,
-          kills: state.kills,
-          deaths: state.deaths,
-          revives: state.revives,
-          alive_players: state.alivePlayers,
-          match_started_at: state.matchStartedAt,
-          match_ended_at: new Date().toISOString()
-        },
-        client_environment: {
-          app: "BGMS Companion",
-          version: "0.1.0",
-          source: "overwolf"
-        }
-      })
+      body: JSON.stringify(payload)
+    }).then(function (response) {
+      if (response.ok) {
+        patchState({
+          lastEvent: "Session summary sent"
+        });
+        return;
+      }
+
+      // 4xx는 재시도해도 동일하게 실패하므로 즉시 중단한다.
+      if (response.status >= 400 && response.status < 500) {
+        patchState({
+          lastEvent: "Session summary rejected"
+        });
+        return;
+      }
+
+      scheduleSummaryRetry(attempt);
     }).catch(function () {
-      state.summarySent = false;
-      notifySubscribers();
+      scheduleSummaryRetry(attempt);
     });
+  }
+
+  function scheduleSummaryRetry(attempt) {
+    if (attempt >= MAX_SUMMARY_ATTEMPTS) {
+      patchState({
+        lastEvent: "Session summary failed"
+      });
+      return;
+    }
+
+    patchState({
+      summarySent: false,
+      summaryReady: true
+    });
+
+    window.setTimeout(function () {
+      sendSessionSummary(attempt + 1);
+    }, SUMMARY_RETRY_DELAY_MS * attempt);
   }
 
   function subscribe(callback) {
@@ -718,14 +616,22 @@
     hideOverlay: function () {
       setOverlayVisible(false);
     },
-    ensureGepSubscription: ensureGepSubscription
+    closeDesktop: closeDesktopWindow,
+    ensureGepSubscription: ensureGepSubscription,
+    applyOverlaySettings: applyOverlaySettings,
+    refreshDiagnostics: function () {
+      refreshGepInfoSnapshot();
+      fetchServiceStatus(state.detectedClassId);
+    }
   };
 
-  if (!hasOverwolfApi()) {
+  if (!hasBaseOverwolfApi()) {
     return;
   }
 
   getCurrentWindow(function () {
+    readAppVersion();
+    applyClientLanguage();
     registerHotkey();
     registerGameListeners();
   });

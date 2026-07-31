@@ -6,18 +6,25 @@
     kills: 2,
     alivePlayers: null,
     health: 74,
+    koHealth: 100,
+    knocked: false,
     weaponState: "Ready",
     lastEvent: "Preview mode",
     matchStartedAt: new Date().toISOString(),
     matchEnded: false,
     gepStatus: "preview",
-    detectedGameId: 10906,
+    gepErrorReason: "",
+    serviceStatusState: 1,
+    serviceStatusMessage: "",
+    detectedGameId: 109061,
+    detectedClassId: 10906,
     detectedGameRunning: true,
     lastFeature: "me",
     lastKey: "health",
-    lastRawValue: "{\"health\":74}",
+    lastRawValue: "{\"health\":74,\"ko_health\":100}",
     lastGepEventName: "",
-    recentUpdates: ["info:me:health"]
+    recentUpdates: ["info:me:health"],
+    ignoredUpdates: []
   };
 
   var elements = {};
@@ -29,14 +36,66 @@
     elements.phase = document.getElementById("phase");
     elements.kills = document.getElementById("kills");
     elements.alive = document.getElementById("alive");
+    elements.aliveItem = document.getElementById("alive-item");
     elements.health = document.getElementById("health");
+    elements.healthItem = document.getElementById("health-item");
+    elements.knockedFlag = document.getElementById("knocked-flag");
     elements.weaponState = document.getElementById("weapon-state");
     elements.lastEvent = document.getElementById("last-event");
+    elements.serviceWarning = document.getElementById("service-warning");
     elements.debugGep = document.getElementById("debug-gep");
     elements.debugGame = document.getElementById("debug-game");
     elements.debugLast = document.getElementById("debug-last");
     elements.debugRaw = document.getElementById("debug-raw");
     elements.debugRecent = document.getElementById("debug-recent");
+    elements.debugService = document.getElementById("debug-service");
+    elements.debugError = document.getElementById("debug-error");
+  }
+
+  function applyOverlaySettings() {
+    var settings = window.bgmsI18n.getOverlaySettings();
+
+    document.documentElement.style.setProperty("--overlay-opacity", String(settings.opacity));
+    document.body.setAttribute("data-overlay-mode", settings.mode);
+
+    if (elements.debugGep) {
+      elements.debugGep.parentElement.classList.toggle("is-hidden", settings.mode !== "debug");
+    }
+  }
+
+  // 공식 status code: 0 unsupported, 1 green, 2 yellow, 3 red
+  function translateServiceStatus(statusState) {
+    var t = window.bgmsI18n.translate;
+
+    if (statusState === 0) {
+      return t("statusUnsupported");
+    }
+
+    if (statusState === 1) {
+      return t("statusGood");
+    }
+
+    if (statusState === 2) {
+      return t("statusPartial");
+    }
+
+    if (statusState === 3) {
+      return t("statusDown");
+    }
+
+    return t("statusUnknown");
+  }
+
+  function setText(element, text) {
+    if (element) {
+      element.textContent = text;
+    }
+  }
+
+  function toggleHidden(element, hidden) {
+    if (element) {
+      element.classList.toggle("is-hidden", hidden);
+    }
   }
 
   function render(state) {
@@ -45,22 +104,43 @@
       ? t("matchEnded")
       : state.matchStartedAt
         ? t("liveMatch")
-        : t("waitingForPubg");
+        : state.detectedGameRunning
+          ? t("waitingForMatch")
+          : t("waitingForPubg");
+    var phaseLabel = state.phase || t("idle");
+    var hasAlive = state.alivePlayers !== null && state.alivePlayers !== undefined;
+    var hasHealth = state.health !== null && state.health !== undefined;
+    var isDegraded = state.serviceStatusState === 2 || state.serviceStatusState === 3 || state.gepStatus === "error" || state.gepStatus === "unavailable";
+
+    if (state.gepStatus === "connected" && !state.lastInfoReceivedAt && phaseLabel === "Idle") {
+      phaseLabel = t("sync");
+    }
 
     lastState = state;
 
-    elements.matchState.textContent = matchLabel;
-    elements.phase.textContent = state.phase || t("idle");
-    elements.kills.textContent = String(state.kills || 0);
-    elements.alive.textContent = state.alivePlayers === null || state.alivePlayers === undefined ? "--" : String(state.alivePlayers);
-    elements.health.textContent = state.health === null || state.health === undefined ? "--" : String(state.health);
-    elements.weaponState.textContent = state.weaponState || t("weaponUnknown");
-    elements.lastEvent.textContent = state.lastEvent || t("noLiveEvents");
-    elements.debugGep.textContent = t("gep") + " " + (state.gepStatus || "idle");
-    elements.debugGame.textContent = t("game") + " " + (state.detectedGameId || "--") + " / " + (state.detectedGameRunning ? t("run") : t("off"));
-    elements.debugLast.textContent = t("last") + " " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-");
-    elements.debugRaw.textContent = t("raw") + " " + (state.lastRawValue || "--");
-    elements.debugRecent.textContent = t("recent") + " " + ((state.recentUpdates || []).join(" | ") || "--");
+    setText(elements.matchState, matchLabel);
+    setText(elements.phase, phaseLabel);
+    setText(elements.kills, String(state.kills || 0));
+    setText(elements.alive, hasAlive ? String(state.alivePlayers) : "--");
+    setText(elements.health, hasHealth ? String(state.health) : "--");
+    toggleHidden(elements.aliveItem, !hasAlive);
+    toggleHidden(elements.healthItem, !hasHealth);
+    toggleHidden(elements.knockedFlag, !state.knocked);
+    setText(elements.weaponState, state.weaponState || t("weaponUnknown"));
+    setText(elements.lastEvent, state.lastEvent || t("noLiveEvents"));
+
+    toggleHidden(elements.serviceWarning, !isDegraded);
+    setText(elements.serviceWarning, isDegraded
+      ? translateServiceStatus(state.serviceStatusState) + (state.gepErrorReason ? " / " + state.gepErrorReason : "")
+      : "");
+
+    setText(elements.debugGep, t("gep") + " " + (state.gepStatus || "idle"));
+    setText(elements.debugGame, t("game") + " " + (state.detectedClassId || "--") + " (" + (state.detectedGameId || "--") + ") / " + (state.detectedGameRunning ? t("run") : t("off")));
+    setText(elements.debugLast, t("last") + " " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-"));
+    setText(elements.debugRaw, t("raw") + " " + (state.lastRawValue || "--"));
+    setText(elements.debugRecent, t("recent") + " " + ((state.recentUpdates || []).join(" | ") || "--"));
+    setText(elements.debugService, t("serviceStatusLabel") + " " + translateServiceStatus(state.serviceStatusState));
+    setText(elements.debugError, t("gepErrorLabel") + " " + (state.gepErrorReason || "--"));
   }
 
   function subscribeToController() {
@@ -82,6 +162,7 @@
 
   queryElements();
   window.bgmsI18n.applyTranslations(document);
+  applyOverlaySettings();
   render(previewState);
   subscribeToController();
 
@@ -90,12 +171,18 @@
       window.bgmsI18n.applyTranslations(document);
       render(lastState);
     }
+
+    if (event.key === "bgms_companion_overlay_settings") {
+      applyOverlaySettings();
+    }
   });
 
   window.addEventListener("bgms:language-change", function () {
     window.bgmsI18n.applyTranslations(document);
     render(lastState);
   });
+
+  window.addEventListener("bgms:overlay-settings-change", applyOverlaySettings);
 
   window.addEventListener("beforeunload", function () {
     if (typeof unsubscribe === "function") {

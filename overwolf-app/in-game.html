@@ -8,41 +8,31 @@
   </head>
   <body class="overlay-shell">
     <main class="overlay-card" aria-label="BGMS Companion live overlay" data-i18n-aria-label="overlayAriaLabel">
-      <header class="overlay-header">
-        <div>
-          <p class="eyebrow" data-i18n="overlayEyebrow">BGMS Companion</p>
-          <h1 id="match-state" data-i18n="waitingForPubg">Waiting for PUBG</h1>
-        </div>
-        <div class="phase-pill" id="phase" data-i18n="idle">Idle</div>
-      </header>
-
-      <section class="metric-grid" aria-label="Live match metrics">
-        <div class="metric">
-          <span class="metric-label" data-i18n="kills">Kills</span>
-          <strong id="kills">0</strong>
-        </div>
-        <div class="metric">
-          <span class="metric-label" data-i18n="alive">Alive</span>
-          <strong id="alive">--</strong>
-        </div>
-        <div class="metric">
-          <span class="metric-label" data-i18n="health">Health</span>
-          <strong id="health">--</strong>
-        </div>
+      <section class="mini-hud" aria-label="Live match metrics">
+        <span class="mini-brand" data-i18n="overlayEyebrow">BGMS Companion</span>
+        <span class="mini-phase" id="phase" data-i18n="idle">Idle</span>
+        <span class="mini-item"><span data-i18n="kills">Kills</span> <strong id="kills">0</strong></span>
+        <span class="mini-item" id="health-item"><span data-i18n="health">Health</span> <strong id="health">--</strong></span>
+        <span class="mini-flag is-hidden" id="knocked-flag" data-i18n="knockedLabel">KO</span>
+        <span class="mini-item" id="alive-item"><span data-i18n="alive">Alive</span> <strong id="alive">--</strong></span>
       </section>
 
-      <section class="status-row" aria-label="Player state">
-        <span id="weapon-state" data-i18n="weaponUnknown">Weapon state unknown</span>
+      <section class="mini-status" aria-label="Match state">
+        <span id="match-state" data-i18n="waitingForPubg">Waiting for PUBG</span>
         <span id="last-event" data-i18n="noLiveEvents">No live events yet</span>
+        <span id="service-warning" class="mini-warning is-hidden" role="status"></span>
       </section>
 
-      <section class="debug-panel" aria-label="Debug state">
+      <section class="debug-panel is-hidden" aria-label="Debug state">
         <span id="debug-gep">GEP idle</span>
         <span id="debug-game">Game --</span>
         <span id="debug-last">Last --</span>
         <span id="debug-raw">Raw --</span>
         <span id="debug-recent">Recent --</span>
+        <span id="debug-service">Service --</span>
+        <span id="debug-error">Error --</span>
       </section>
+      <span id="weapon-state" class="visually-hidden" data-i18n="weaponUnknown">Weapon state unknown</span>
     </main>
 
     <script src="i18n.js"></script>

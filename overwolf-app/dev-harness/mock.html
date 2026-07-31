@@ -109,8 +109,15 @@
       <h3>Scenario Runner</h3>
       <button class="btn" onclick="mockScenarios.startMatch()">1. Start Match (Airfield)</button>
       <button class="btn" onclick="mockScenarios.addKills()">2. Trigger Kill (+1 Kill)</button>
-      <button class="btn" onclick="mockScenarios.matchEndDuplicate()">3. Trigger Match End (Duplicate Check)</button>
-      <button class="btn" onclick="mockScenarios.simulateFailure()" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">4. GEP Data Missing (Failure Case)</button>
+      <button class="btn" onclick="mockScenarios.knockAndRevive()">3. Knocked out then revived</button>
+      <button class="btn" onclick="mockScenarios.eliminateRoster()">4. Roster player out</button>
+      <button class="btn" onclick="mockScenarios.deathByKiller()">5. Death + killer name</button>
+      <button class="btn" onclick="mockScenarios.matchEndDuplicate()">6. Match End (Duplicate Check)</button>
+      <button class="btn" onclick="mockScenarios.injectUnusedFeatures()">7. rank/map payload (must be ignored)</button>
+      <button class="btn" onclick="mockScenarios.injectBlockedPayloads()" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">8. Blocked payloads (policy check)</button>
+      <button class="btn" onclick="mockScenarios.triggerGepError()" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">9. GEP onError</button>
+      <button class="btn" onclick="mockScenarios.degradeServiceStatus()" style="border-color: rgba(246, 198, 103, 0.4); background: rgba(246, 198, 103, 0.1);">10. Service status yellow</button>
+      <button class="btn" onclick="mockScenarios.simulateFailure()" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">11. GEP Data Missing (Failure Case)</button>
 
       <h3>Interactive Controls</h3>
       <div class="slider-group">
@@ -136,6 +143,7 @@
             <div class="mini-item" id="health-item">
               <span>HP:</span> <strong id="health">--</strong>
             </div>
+            <span class="mini-flag is-hidden" id="knocked-flag" data-i18n="knockedLabel">KO</span>
             <div class="mini-item">
               <span data-i18n="kills">Kills</span>: <strong id="kills">0</strong>
             </div>
@@ -144,6 +152,7 @@
             <span id="match-state">Waiting for PUBG</span>
             <span id="weapon-state">Weapon state unknown</span>
             <span id="last-event">No live events yet</span>
+            <span id="service-warning" class="mini-warning is-hidden"></span>
           </div>
           <!-- 디버그 패널 -->
           <div class="debug-panel" id="debug-panel">
@@ -152,6 +161,8 @@
             <span id="debug-last">Last -:-</span>
             <span id="debug-raw">Raw --</span>
             <span id="debug-recent">Recent --</span>
+            <span id="debug-service">Service --</span>
+            <span id="debug-error">Error --</span>
           </div>
         </div>
       </div>
@@ -176,8 +187,16 @@
               <dd id="desktop-gep-status">--</dd>
             </div>
             <div>
+              <dt data-i18n="serviceStatusLabel">Event service status</dt>
+              <dd id="desktop-service-status">--</dd>
+            </div>
+            <div>
               <dt data-i18n="gameStatusLabel">Game</dt>
               <dd id="desktop-game-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="matchIdLabel">Match ID</dt>
+              <dd id="desktop-match-id" class="diagnostic-wrap">--</dd>
             </div>
             <div>
               <dt data-i18n="lastEventLabel">Last event</dt>
@@ -185,7 +204,7 @@
             </div>
             <div>
               <dt data-i18n="recentUpdatesLabel">Recent updates</dt>
-              <dd id="desktop-recent-updates">--</dd>
+              <dd id="desktop-recent-updates" class="diagnostic-wrap">--</dd>
             </div>
             <div>
               <dt data-i18n="seenFeaturesLabel">Seen features</dt>
@@ -200,10 +219,27 @@
               <dd id="desktop-missing-updates" class="diagnostic-wrap">--</dd>
             </div>
             <div>
+              <dt data-i18n="ignoredUpdatesLabel">Ignored updates</dt>
+              <dd id="desktop-ignored-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepVersionLabel">GEP version</dt>
+              <dd id="desktop-gep-version">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepErrorLabel">GEP error</dt>
+              <dd id="desktop-gep-error" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="handoffLabel">Session handoff</dt>
+              <dd id="desktop-handoff" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
               <dt data-i18n="requiredResultLabel">Required result</dt>
               <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
             </div>
           </dl>
+          <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
         </article>
       </div>
     </div>
@@ -212,6 +248,7 @@
     <script src="mock-overwolf.js"></script>
     <script src="mock-scenarios.js"></script>
     <script src="../i18n.js"></script>
+    <script src="../gep-state.js"></script>
     <script src="../background.js"></script>
     <script src="../in-game.js"></script>
     <script src="../desktop.js"></script>

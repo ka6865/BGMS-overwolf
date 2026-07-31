@@ -8,6 +8,14 @@
   </head>
   <body class="desktop-shell">
     <main class="desktop-page">
+      <div class="desktop-titlebar" id="desktop-drag-handle" aria-label="Move BGMS Companion window">
+        <span>BGMS Companion</span>
+        <div class="desktop-titlebar-actions">
+          <span data-i18n="desktopDragHint">Drag to move window</span>
+          <button type="button" id="desktop-close" data-i18n-aria-label="closeDesktop" aria-label="Close">×</button>
+        </div>
+      </div>
+
       <nav class="language-switcher" aria-label="Language">
         <span data-i18n="languageLabel">Language</span>
         <button type="button" data-language="en" aria-pressed="true" data-i18n="languageEnglish">English</button>
@@ -23,6 +31,97 @@
             BGMS Companion shows a compact in-game status overlay and prepares a session summary for BGMS after the match ends.
           </p>
         </div>
+      </section>
+
+      <section class="settings-grid" aria-label="Overlay settings">
+        <article class="panel settings-panel">
+          <h2 data-i18n="settingsTitle">Overlay settings</h2>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="overlayModeLabel">Overlay mode</span>
+            <div class="segmented-control" role="group" aria-label="Overlay mode">
+              <button type="button" data-setting="mode" data-value="mini" data-i18n="overlayModeMini">Mini</button>
+              <button type="button" data-setting="mode" data-value="debug" data-i18n="overlayModeDebug">Debug</button>
+            </div>
+          </div>
+
+          <label class="control-group">
+            <span class="control-label" data-i18n="opacityLabel">Opacity</span>
+            <input id="overlay-opacity" type="range" min="0.35" max="1" step="0.05" value="1">
+          </label>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="positionLabel">Position</span>
+            <div class="segmented-control" role="group" aria-label="Overlay position">
+              <button type="button" data-setting="position" data-value="top-left" data-i18n="positionTopLeft">Top left</button>
+              <button type="button" data-setting="position" data-value="top-center" data-i18n="positionTopCenter">Top center</button>
+              <button type="button" data-setting="position" data-value="top-right" data-i18n="positionTopRight">Top right</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel diagnostics-panel">
+          <h2 data-i18n="diagnosticsTitle">Live diagnostics</h2>
+          <dl class="diagnostics-list">
+            <div>
+              <dt data-i18n="gepStatusLabel">GEP status</dt>
+              <dd id="desktop-gep-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="serviceStatusLabel">Event service status</dt>
+              <dd id="desktop-service-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gameStatusLabel">Game</dt>
+              <dd id="desktop-game-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="matchIdLabel">Match ID</dt>
+              <dd id="desktop-match-id" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="lastEventLabel">Last event</dt>
+              <dd id="desktop-last-event">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="recentUpdatesLabel">Recent updates</dt>
+              <dd id="desktop-recent-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="seenFeaturesLabel">Seen features</dt>
+              <dd id="desktop-seen-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="supportedFeaturesLabel">Supported features</dt>
+              <dd id="desktop-supported-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="missingUpdatesLabel">Missing updates</dt>
+              <dd id="desktop-missing-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="ignoredUpdatesLabel">Ignored updates</dt>
+              <dd id="desktop-ignored-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepVersionLabel">GEP version</dt>
+              <dd id="desktop-gep-version">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepErrorLabel">GEP error</dt>
+              <dd id="desktop-gep-error" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="handoffLabel">Session handoff</dt>
+              <dd id="desktop-handoff" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="requiredResultLabel">Required result</dt>
+              <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
+            </div>
+          </dl>
+          <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
+        </article>
       </section>
 
       <section class="desktop-grid" aria-label="App status">

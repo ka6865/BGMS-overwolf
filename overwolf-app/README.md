@@ -1,29 +1,52 @@
 # BGMS Companion Overwolf MVP
 
-This folder contains the Phase 1 Overwolf app draft for BGMS review and Overwolf submission preparation.
+This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submission preparation.
 
 ## Scope
 
-- Default language: English
-- Target game: PUBG
-- GEP features: `match`, `phase`, `kill`, `death`, `revived`, `killer`, `roster`, `me`
-- In-game UI only: match state, phase, kills, alive count, health, weapon state, latest local event
+- Default language: English (Korean is an optional local setting)
+- Target game: PUBG, base game id `10906`
+- GEP features: `match`, `match_info`, `phase`, `kill`, `death`, `revived`, `killer`, `roster`, `me`
+- In-game UI only: match state, phase, kills, alive count, health (with KO flag), weapon state, latest local event, degraded-service warning
 - GEP subscription owner: `background.js`
+- GEP payload parsing owner: `gep-state.js` (pure module, unit tested)
 - In-game window role: render state from the background controller only
 - Optional post-match session summary handoff: disabled until `SESSION_ENDPOINT` is set in `background.js`
 
 ## Explicitly Out Of Scope
 
-- Real-time damage meter or DPS display
+- Real-time damage meter or DPS display (`damage_dealt`, `total_damage_dealt`, `damageTaken` are blocked in the reducer)
 - Live location, team location, minimap, zones, or coordinates
 - Direct PUBG API calls from GEP events
 - Supabase service role key or private backend credentials
 - Database writes from the Overwolf client
 - Any change to BGMS core analysis APIs
 
+## File Layout
+
+| File | Role |
+| --- | --- |
+| `manifest.json` | Overwolf app manifest (windows, hotkeys, game targeting, GEP version floor) |
+| `background.js` | Overwolf API side: game detection, GEP subscription, windows, network |
+| `gep-state.js` | Pure GEP payload reducer. No Overwolf API calls, unit tested |
+| `in-game.js` / `in-game.html` | Compact HUD renderer |
+| `desktop.js` / `desktop.html` | Settings and live diagnostics window |
+| `i18n.js` | English default dictionary plus optional Korean |
+| `dev-harness/` | Browser harness with a mock Overwolf API and official-shaped GEP scenarios |
+| `tests/` | `node --test` suites for the reducer and the background wiring |
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs `node --test overwolf-app/tests/*.test.js`. No Overwolf client, no game, and no dependencies required. `background-controller.test.js` loads the dev-harness mock API in a `vm` context to verify controller wiring.
+
 ## Local Preview
 
-Open `desktop.html` or `in-game.html` in a browser to inspect the static UI. Without Overwolf APIs, the in-game window enters preview mode with sample UI state only.
+- `open overwolf-app/dev-harness/mock.html` for the interactive harness (scenario buttons for match flow, knock/revive, roster elimination, duplicate `matchEnd`, blocked payloads, GEP errors, degraded service status).
+- Opening `desktop.html` or `in-game.html` directly shows static preview state without Overwolf APIs.
 
 ## OPK Packaging
 
@@ -31,20 +54,32 @@ When building an `.opk` for Windows testing, compress the contents of `overwolf-
 
 ## Controller Notes
 
-`background.js` owns `setRequiredFeatures()`, `onInfoUpdates2`, and `onNewEvents`. It exposes `window.bgmsController` so declared windows can subscribe to state snapshots through `overwolf.windows.getMainWindow()`.
+`background.js` owns `setRequiredFeatures()`, `onInfoUpdates2`, `onNewEvents`, and `onError`. It exposes `window.bgmsController` so declared windows can subscribe to state snapshots through `overwolf.windows.getMainWindow()`.
 
-The controller keeps a single GEP listener registration and a single required-feature activation flow per background runtime. Closing and reopening the overlay only changes the renderer window; it does not register new GEP listeners.
+Runtime `RunningGameInfo.id` includes an instance digit (`109061` observed for PUBG). The controller converts it to the base game id with `classId` or `Math.floor(id / 10)` before comparing against `10906`.
 
-`match_id` and `pseudo_match_id` are stored separately. `effectiveMatchId` prefers `match_id` when present and falls back to `pseudo_match_id`.
+GEP listeners are removed before being added again, which is the documented best practice for avoiding duplicate registrations. Closing and reopening the overlay only changes the renderer window.
 
-Roster parsing is intentionally conservative until GEP Simulator payloads are confirmed. The current parser counts alive players only when a roster item has a known `out` boolean-like value.
+`match_id` and `pseudo_match_id` are stored separately. `effectiveMatchId` prefers `match_id` and falls back to `pseudo_match_id`.
+
+`matchEnd` can fire twice (on death and on returning to the lobby). Only the first event marks the session summary as ready; later ones just increase `matchEndCount`. A new `session_id` is issued on `matchStart` so a server-side idempotency key never collides across matches.
+
+Feature routing is keyed on the GEP `feature` field first. The `rank` feature uses info key `match_info.me`, which collides with the `me` feature if only the key is inspected.
+
+Roster parsing stays conservative: alive count updates only when a roster item exposes a known `out`-like value, otherwise the previous count is kept.
+
+## Diagnostics
+
+The desktop window shows GEP status, Overwolf event service status (from `https://game-events-status.overwolf.com/10906_prod.json`), detected class/instance id, match id, seen/supported/missing/ignored features, GEP version, GEP error reason, and session handoff state. The overlay shows a short warning line when the service is degraded or `onError` fires.
 
 ## Localization
 
-English is the default app language for Overwolf review. Korean is available as an optional local setting from the desktop window and is stored locally in `localStorage`.
+English is the default app language for Overwolf review. Korean is available as an optional local setting from the desktop window and is stored locally in `localStorage`. If the user has never chosen a language and the Overwolf client language is Korean, Korean is applied once as the initial default.
 
 ## Overwolf Review Notes
 
 BGMS owns and operates the `bgms.kr` domain, BGMS web service, backend, and processing pipeline. BGMS does not claim ownership of PUBG or KRAFTON source game data. The app uses Overwolf GEP for live overlay context and BGMS-controlled service endpoints for post-match handoff.
+
+Domain control is verified through `https://bgms.kr/overwolf-verification.txt`.
 
 Before packaging, verify the PUBG Overwolf game ID and manifest schema in the current Overwolf Developer Console.
