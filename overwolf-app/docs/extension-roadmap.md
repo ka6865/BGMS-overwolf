@@ -168,30 +168,30 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 - Developer Console 제출용 store listing/아이콘/스크린샷 정리
 - `.opk` 패키징 후 unpacked 제한 기능 재확인
 
-### Phase 1.5 오버레이 재구성 (신규, 2026-08-01)
+### Phase 1.5 오버레이 재구성 (2026-08-01 구현 완료)
 
 목표는 오버레이를 "게임 HUD 복제"에서 "게임이 안 보여주는 것"으로 바꾸는 것이다. 위 사용자 가치 기준 1번을 통과하지 못하는 현재 구성을 정리한다.
 
-제거 또는 축소 검토 대상 (배그 기본 HUD와 중복):
+HUD 에서 제거 완료 (배그 기본 HUD와 중복). 리듀서는 계속 수집하며 세션 요약과 사후 분석에 사용한다:
 
-- 킬 수: 게임 내장 HUD에 이미 있다
-- 생존자 수: 게임 화면 상단에 이미 있다
-- 체력: 게임 하단 체력바에 이미 있다. 단 `ko_health` 기반 KO 표시는 게임 표현과 다르므로 판단 보류
-- 무기 상태: 게임 하단 무기 슬롯에 이미 있다. 현재도 화면에는 안 보이고 스크린리더용으로만 존재한다
-- 최근 이벤트: 킬피드와 겹친다. 팀원 기절 후 본인 마무리처럼 킬피드가 놓치는 경우만 남길지 검토
+- 킬 수: 게임 내장 HUD에 이미 있어 제거
+- 생존자 수: 게임 화면 상단에 이미 있어 제거
+- 체력: 게임 하단 체력바에 이미 있어 제거. `ko_health` 기반 KO 플래그는 게임 표현과 달라 유지
+- 무기 상태: 게임 하단 무기 슬롯에 이미 있음. 화면에는 노출하지 않고 스크린리더용으로만 유지
+- 최근 이벤트: 상태 줄에 유지. 팀원 기절 후 본인 마무리처럼 킬피드가 놓치는 경우를 다룬다
 
-추가 검토 대상 (게임이 안 보여주는 정보):
+추가 완료 (게임이 매치 중 보여주지 않는 정보):
 
-- `headshots`, `max_kill_distance` (`kill` feature). 매치 중 누적값을 게임은 표시하지 않는다. 허용 feature 안에 있어 Phase 1 범위로 처리 가능하다
-- `rank` (종료 시 순위/총원). info key가 `match_info.me`로 `me`와 겹치므로 feature 기준 분기가 필수다
-- `map` (맵 이름). 위치 없이 이름만 표시하는 것은 후보이며 미니맵으로 연결하지 않는다
+- `headshots`, `max_kill_distance` (`kill` feature). HUD 에 표시한다
+- `rank` (종료 시 순위/총원). 값이 있을 때만 HUD 에 노출한다. feature 기준 분기로 `me` 와 분리했다
+- `map` (맵 이름). HUD 에는 넣지 않고 세션 요약과 웹 화면에서 사용한다
 
-진단 패널 처리:
+진단 패널 처리 (완료):
 
-- 데스크탑 진단 14항목은 개발자 도구다. 기본 접힘으로 바꾸고 `isServiceDegraded`가 true일 때 또는 사용자가 펼칠 때만 노출한다
+- 데스크탑 진단 14항목을 `<details>` 기반 기본 접힘으로 바꿨다. `isServiceDegraded` 가 true 가 되면 한 번 자동으로 펼치고, 사용자가 접은 뒤에는 강제로 다시 펼치지 않는다
 - 오버레이 debug 모드는 유지한다. 실게임 검증에 필요하다
 
-이 단계는 새 permission이나 금지 데이터를 쓰지 않으므로 Phase 1 범위에서 진행 가능하다. 다만 표시 항목 변경은 store listing 문구와 스크린샷에 영향을 주므로 제출 전에 확정한다.
+새 permission 이나 금지 데이터를 쓰지 않았다. 실측 결과 최악 케이스(순위 + KO + 3자리 거리 + Loading 페이즈)에서 334px/334px 로 넘침이 없다. store listing 문구와 스크린샷은 이 구성 기준으로 다시 준비해야 한다.
 
 ### Phase 2 세션 handoff (전송 경로 완료, 분석 연계 미착수)
 
@@ -206,15 +206,17 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 
 남은 항목:
 
-**최우선 (출시 가치의 최소 조건)**: 저장된 세션 요약을 BGMS 웹에서 볼 수 있는 화면. 현재는 적재만 하므로 사용자 입장에서 "보냈는데 볼 곳이 없는" 상태다. 이 화면이 없으면 앱을 켤 이유를 설명할 수 없다.
+**최우선 항목 완료 (2026-08-01)**: 저장된 세션 요약을 BGMS 웹에서 볼 수 있는 화면을 구현했다.
 
-- 세션 요약 목록과 상세 화면. `overwolf_session_events`를 읽는 경로가 웹에 아직 하나도 없다
-- 오버레이 또는 데스크탑 창에서 해당 화면으로 나가는 링크. `utils.openUrlInDefaultBrowser` 사용 후보이며 현재 앱에는 외부 링크가 없다
-- 세션 요약과 공식 API 매치를 `match_id`로 연결. 공식 문서 확인 결과 GEP `match_id`는 공식 API match id 와 같은 체계이므로 연결이 성립한다. 단 `pseudo_match_id`는 Overwolf 생성값이라 조회 키로 쓸 수 없으므로, `effectiveMatchId`가 `pseudo_match_id`로 채워진 경우를 공식 API 조회에 넘기지 않도록 구분해야 한다. 실게임에서 `match_id` 실제 emit 여부 확인이 남아 있다
+- `app/overwolf/sessions` 화면과 `components/overwolf/OverwolfSessionList.tsx`. 닉네임/플랫폼으로 조회하고 세션 카드에 순위, 처치, 헤드샷, 최장 킬, 사망/기절/부활을 보여준다
+- `app/api/overwolf/sessions/route.ts`(GET) + `list_overwolf_sessions` / `get_overwolf_session` RPC. 읽기도 `service_role` 전용이며 `source_host`/`is_internal` 은 반환하지 않는다
+- 데스크탑 창의 "내 세션 기록 열기" 버튼이 `overwolf.utils.openUrlInDefaultBrowser` 로 이 화면을 연다. 이 API 는 별도 permission 을 요구하지 않아 manifest 권한이 늘지 않았다
+- 공식 API 조회 가능 여부를 `gep_summary.official_match_id` 로 분리해 담고, 화면은 `canOpenAnalysis` 가 true 인 세션만 `/stats/{platform}/{nickname}` 분석 경로로 연결한다. `pseudo_match_id` 만 있는 세션은 "공식 매치 ID 미수신" 으로 표기하고 링크를 만들지 않는다
 
 그다음:
 
-- `rank`, `map` 같은 사후 요약 보조 필드 추가 여부 결정
+- 실게임에서 `match_id` 실제 emit 여부 확인. `pseudo_match_id` 만 온다면 분석 연결이 성립하지 않으므로 이 방향의 전제가 흔들린다
+- 세션 상세를 특정 매치의 텔레메트리 맵 분석으로 직접 연결. 현재는 플레이어 전적 화면까지만 연결한다
 - 세션 요약을 근거로 사후 분석을 자동 트리거하는 흐름. PUBG API 직접 호출 금지와 기존 레이트리밋 경로 준수가 전제이며 별도 승인이 필요하다
 
 차별화 연결점: 이 화면이 단순 숫자 요약이면 Statsly, Match Bar와 구분되지 않는다. BGMS 텔레메트리 맵 분석으로 이어지는 진입점이 되어야 한다. 위 "차별화 포지션" 절을 따른다.
@@ -233,8 +235,17 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 
 영상 없이 먼저 할 수 있는 것 (권한 불필요, 우선 검토):
 
-- `death`와 `killer` 수신 시점을 세션 요약에 타임스탬프로 남기고, 사후에 BGMS 웹에서 그 시점의 텔레메트리 맵 상황을 보여준다. Ouch의 사망 리뷰 프레이밍을 BGMS 맵 분석 강점에 붙이는 조합이다
-- 현재 구독 중인 feature만 쓰고 새 permission이 없으므로, `media` 권한 검증보다 먼저 진행할 수 있다. 다만 서버 스키마와 웹 화면이 걸려 있어 Phase 2 승인 범위에서 함께 다룬다
+영상 없는 사후 리뷰 1단계 완료 (2026-08-01):
+
+- `death`, `killer`, `knockedout`, `revived`, `kill` 수신 시점을 세션 요약의 `event_timeline` 에 담는다. 항목은 `{ t: 경과초, kind, detail? }` 이며 좌표와 데미지는 담지 않는다
+- 경과 초는 `matchStart` 기준이고 시작 시각을 모르면 `null` 이다. 최대 40건으로 제한한다
+- 웹 세션 카드에서 "교전 시점" 을 펼치면 `1:30 기절`, `7:00 처치`, `24:30 가해자 Ace_Tullis` 형태로 시각순 정렬해 보여준다
+- 새 permission 없이 현재 구독 feature 만 사용했다
+
+남은 항목:
+
+- 저장된 시점을 근거로 공식 API 텔레메트리에서 해당 구간의 맵 상황(위치, 자기장, 주변 교전)을 찾아 보여주는 단계. 이것이 Ouch 프레이밍을 BGMS 맵 분석 강점에 실제로 붙이는 지점이며 `match_id` 연결이 전제다
+- 영상/스크린샷 캡처는 `media` 권한 검증 후 별도 승인 대상이다
 
 ### Phase 4 개인화와 설정
 

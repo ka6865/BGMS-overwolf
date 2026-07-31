@@ -8,6 +8,7 @@
   var gameInfoListeners = [];
   var windowSizeCalls = [];
   var windowPositionCalls = [];
+  var openedUrls = [];
 
   // PUBG instance id. 공식 규칙상 manifest용 class id는 floor(109061 / 10) = 10906 이다.
   var PUBG_INSTANCE_ID = 109061;
@@ -88,8 +89,14 @@
     extensions: {
       current: {
         getManifest: function (callback) {
-          callback({ meta: { version: "0.4.0" } });
+          callback({ meta: { version: "0.5.0" } });
         }
+      }
+    },
+    // 기본 브라우저로 URL 을 여는 대신 호출 이력만 남긴다.
+    utils: {
+      openUrlInDefaultBrowser: function (url) {
+        openedUrls.push(String(url));
       }
     },
     games: {
@@ -289,6 +296,10 @@
     resetWindowCalls: function () {
       windowSizeCalls.length = 0;
       windowPositionCalls.length = 0;
+    },
+    // openUrlInDefaultBrowser 호출 이력. 웹 세션 기록 링크 검증에 사용한다.
+    openedUrls: function () {
+      return openedUrls.slice();
     }
   };
 })();

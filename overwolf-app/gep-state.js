@@ -32,7 +32,9 @@
     "revived",
     "killer",
     "roster",
-    "me"
+    "me",
+    "rank",
+    "map"
   ];
 
   // 정책상 실시간 사용이 금지된 key/event. GEP가 보내더라도 상태에 반영하지 않는다.
@@ -76,9 +78,12 @@
       pseudoMatchId: "",
       effectiveMatchId: "",
       matchMode: "",
+      mapName: "",
       phase: "Idle",
       phaseIsOfficial: null,
       kills: 0,
+      headshots: 0,
+      maxKillDistance: null,
       deaths: 0,
       revives: 0,
       knockdowns: 0,
@@ -90,6 +95,13 @@
       weaponState: "",
       lastEvent: "No live events yet",
       lastKillerName: "",
+      rankPlace: null,
+      rankTotal: null,
+      /*
+       * 사후 리뷰용 이벤트 타임라인(Phase 3).
+       * death/killer/knockedout/revived/kill 발생 시각만 남기고 좌표는 담지 않는다.
+       */
+      eventTimeline: [],
       matchStartedAt: null,
       matchEndedAt: null,
       matchEnded: false,
@@ -137,6 +149,11 @@
       "pseudoMatchId",
       "effectiveMatchId",
       "matchMode",
+      /*
+       * mapName은 매치 시작 전 로비/로딩 단계에서 먼저 도착할 수 있어 유지한다.
+       * rank는 매치 종료 시점 값이므로 유지하지 않고 초기화한다.
+       */
+      "mapName",
       "phase",
       "phaseIsOfficial",
       "gepStatus",
@@ -440,6 +457,61 @@
     });
   }
 
+  // 사후 리뷰 타임라인 최대 항목 수. 세션 요약이 서버 16KB 제한을 넘지 않게 제한한다.
+  var MAX_TIMELINE_ENTRIES = 40;
+
+  /*
+   * Phase 3 사후 리뷰용 이벤트 타임라인에 한 건을 append 한다.
+   * 매치 시작 이후 경과 초와 이벤트 종류만 담고, 좌표나 데미지는 담지 않는다.
+   * 저장된 시점을 근거로 BGMS 웹이 공식 API 텔레메트리에서 해당 구간을 찾는다.
+   */
+  function appendTimeline(state, kind, detail) {
+    var entry;
+    var timeline;
+
+    if (state.eventTimeline.length >= MAX_TIMELINE_ENTRIES) {
+      return state;
+    }
+
+    entry = {
+      t: elapsedSeconds(state.matchStartedAt),
+      kind: kind
+    };
+
+    if (detail) {
+      entry.detail = String(detail).slice(0, 40);
+    }
+
+    timeline = state.eventTimeline.concat([entry]);
+
+    return patch(state, {
+      eventTimeline: timeline
+    });
+  }
+
+  /*
+   * 매치 시작 시각 기준 경과 초. 시작 시각을 모르면 null 을 반환해
+   * 웹에서 타임라인 위치를 추정하지 않도록 한다.
+   */
+  function elapsedSeconds(matchStartedAt) {
+    var started;
+    var elapsed;
+
+    if (!matchStartedAt) {
+      return null;
+    }
+
+    started = Date.parse(matchStartedAt);
+
+    if (!Number.isFinite(started)) {
+      return null;
+    }
+
+    elapsed = Math.round((Date.now() - started) / 1000);
+
+    return elapsed >= 0 ? elapsed : null;
+  }
+
   function applyPhase(state, value) {
     var phase = getStringValue(safeParse(value)) || "Unknown";
 
@@ -491,21 +563,80 @@
   }
 
   function applyKill(state, key, value) {
-    var nextKills;
+    var parsed = normalizeNumber(safeParse(value));
 
-    if (key !== "kills") {
+    if (parsed === null) {
       return state;
     }
 
-    nextKills = normalizeNumber(safeParse(value));
+    if (key === "kills") {
+      return patch(state, {
+        kills: parsed,
+        lastEvent: "Kills updated"
+      });
+    }
 
-    if (nextKills === null) {
+    /*
+     * headshots와 max_kill_distance는 배그 기본 HUD가 매치 중 표시하지 않는 값이다.
+     * 공식 문서상 둘 다 kill feature의 info update이며 누적값으로 온다.
+     */
+    if (key === "headshots") {
+      return patch(state, {
+        headshots: parsed,
+        lastEvent: "Headshots updated"
+      });
+    }
+
+    if (key === "max_kill_distance") {
+      return patch(state, {
+        maxKillDistance: parsed,
+        lastEvent: "Longest kill updated"
+      });
+    }
+
+    return state;
+  }
+
+  /*
+   * rank feature. 공식 문서상 info key는 match_info.me(순위)와 match_info.total(총원)이며
+   * 값은 문자열로 온다. key 이름이 me feature와 겹치므로 feature 기준 분기가 필수다.
+   */
+  function applyRank(state, key, value) {
+    var parsed = normalizeNumber(safeParse(value));
+
+    if (parsed === null) {
+      return state;
+    }
+
+    if (key === "me") {
+      return patch(state, {
+        rankPlace: parsed,
+        lastEvent: "Placement " + parsed
+      });
+    }
+
+    if (key === "total") {
+      return patch(state, {
+        rankTotal: parsed
+      });
+    }
+
+    return state;
+  }
+
+  /*
+   * map feature. 맵 이름만 사용하고 좌표나 미니맵으로 연결하지 않는다.
+   * 사후 요약에서 BGMS 맵 분석과 연결하는 키로 쓴다.
+   */
+  function applyMap(state, value) {
+    var mapName = getStringValue(safeParse(value));
+
+    if (!mapName) {
       return state;
     }
 
     return patch(state, {
-      kills: nextKills,
-      lastEvent: "Kills updated"
+      mapName: mapName
     });
   }
 
@@ -726,6 +857,10 @@
         return applyMatchInfo(nextState, update.key, update.value);
       case "kill":
         return applyKill(nextState, update.key, update.value);
+      case "rank":
+        return applyRank(nextState, update.key, update.value);
+      case "map":
+        return applyMap(nextState, update.value);
       case "roster":
         return applyRoster(nextState, update.key, update.value);
       case "me":
@@ -733,7 +868,7 @@
       case "gep_internal":
         return applyGepInternal(nextState, update.value);
       default:
-        // rank, map, team, counters 등 Phase 1 미사용 feature는 상태에 반영하지 않는다.
+        // team, counters, location 등 미사용 feature는 상태에 반영하지 않는다.
         return recordIgnored(nextState, "unused:" + update.feature + ":" + update.key);
     }
   }
@@ -779,34 +914,34 @@
           lastEvent: "Match ended"
         });
       case "kill":
-        return patch(nextState, {
+        return appendTimeline(patch(nextState, {
           kills: nextState.kills + 1,
           lastEvent: "Kill confirmed"
-        });
+        }), "kill");
       case "death":
-        return patch(nextState, {
+        return appendTimeline(patch(nextState, {
           deaths: nextState.deaths + 1,
           lastEvent: "You died"
-        });
+        }), "death");
       case "revived":
-        return patch(nextState, {
+        return appendTimeline(patch(nextState, {
           revives: nextState.revives + 1,
           knocked: false,
           lastEvent: "You were revived"
-        });
+        }), "revived");
       case "knockedout":
-        return patch(nextState, {
+        return appendTimeline(patch(nextState, {
           knockdowns: nextState.knockdowns + 1,
           knocked: true,
           lastEvent: "You were knocked out"
-        });
+        }), "knockedout");
       case "killer":
         killerName = data && data.killer_name ? getStringValue(data.killer_name) : "";
 
-        return patch(nextState, {
+        return appendTimeline(patch(nextState, {
           lastKillerName: killerName,
           lastEvent: killerName ? "Last killer: " + killerName : "Killer identified"
-        });
+        }), "killer", killerName);
       default:
         return recordIgnored(nextState, "unused-event:" + name);
     }
@@ -902,14 +1037,25 @@
       platform: identity && identity.platform ? identity.platform : null,
       gep_summary: {
         effective_match_id: state.effectiveMatchId || null,
+        /*
+         * 공식 API 조회 가능 여부를 서버와 웹이 판단할 수 있게 구분해서 담는다.
+         * GEP match_id 는 공식 PUBG API match id 와 같은 체계지만
+         * pseudo_match_id 는 Overwolf 생성값이라 조회 키로 쓸 수 없다.
+         */
+        official_match_id: state.matchId || null,
         match_mode: state.matchMode || null,
+        map_name: state.mapName || null,
         phase: state.phase,
         phase_is_official: state.phaseIsOfficial,
         kills: state.kills,
+        headshots: state.headshots,
+        max_kill_distance: state.maxKillDistance,
         deaths: state.deaths,
         revives: state.revives,
         knockdowns: state.knockdowns,
         alive_players: state.alivePlayers,
+        rank_place: state.rankPlace,
+        rank_total: state.rankTotal,
         last_killer_name: state.lastKillerName || null,
         match_started_at: state.matchStartedAt,
         match_ended_at: state.matchEndedAt,
@@ -918,6 +1064,11 @@
         gep_public_version: state.gepPublicVersion || null,
         source: "overwolf_gep"
       },
+      /*
+       * Phase 3 사후 리뷰용 타임라인. 좌표는 담지 않으며 경과 초와 이벤트 종류만 담는다.
+       * gep_summary 안에 두면 서버의 스칼라 화이트리스트에 걸리므로 최상위 키로 분리한다.
+       */
+      event_timeline: state.eventTimeline.slice(0, MAX_TIMELINE_ENTRIES),
       client_environment: assign({
         app: "BGMS Companion",
         source: "overwolf"
@@ -931,6 +1082,7 @@
     BLOCKED_EVENT_NAMES: BLOCKED_EVENT_NAMES,
     OFFICIAL_PHASES: OFFICIAL_PHASES,
     PUBG_CLASS_IDS: PUBG_CLASS_IDS,
+    MAX_TIMELINE_ENTRIES: MAX_TIMELINE_ENTRIES,
     createInitialState: createInitialState,
     resetForNewMatch: resetForNewMatch,
     resolveClassId: resolveClassId,

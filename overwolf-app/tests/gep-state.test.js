@@ -98,7 +98,7 @@ test("me.weaponState: inventory category payload를 사람이 읽는 문자열�
   assert.equal(state.weaponState, "M416 equipped x120");
 });
 
-test("rank.me는 me.health를 오염시키지 않는다", () => {
+test("rank.me는 me.health를 오염시키지 않고 순위로 해석된다", () => {
   let state = gep.reduceInfoUpdatesEvent(baseState(), {
     feature: "me",
     info: { me: { health: "{\"health\":80,\"ko_health\":100}" } }
@@ -109,8 +109,57 @@ test("rank.me는 me.health를 오염시키지 않는다", () => {
     info: { match_info: { me: "38", total: "98" } }
   });
 
+  // 같은 key 이름(me)이지만 feature 기준으로 분기되므로 health 는 그대로여야 한다.
   assert.equal(state.health, 80);
-  assert.ok(state.ignoredUpdates.some((entry) => entry.indexOf("unused:rank") === 0));
+  assert.equal(state.rankPlace, 38);
+  assert.equal(state.rankTotal, 98);
+
+  // 역방향도 확인한다. me.health 가 rank 값을 덮지 않아야 한다.
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "me",
+    info: { me: { health: "{\"health\":45,\"ko_health\":100}" } }
+  });
+
+  assert.equal(state.health, 45);
+  assert.equal(state.rankPlace, 38);
+});
+
+test("map: 맵 이름만 반영하고 좌표 키는 무시한다", () => {
+  let state = gep.reduceInfoUpdatesEvent(baseState(), {
+    feature: "map",
+    info: { map_info: { map: "Erangel_Main" } }
+  });
+
+  assert.equal(state.mapName, "Erangel_Main");
+
+  // location feature 는 여전히 차단 대상이다.
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "location",
+    info: { me: { location: "{\"x\":1,\"y\":2}" } }
+  });
+
+  assert.equal(state.mapName, "Erangel_Main");
+  assert.ok(state.ignoredUpdates.some((entry) => entry.indexOf("blocked:location") === 0));
+});
+
+test("kill: headshots와 max_kill_distance를 수집하고 damage는 차단한다", () => {
+  let state = gep.reduceInfoUpdatesEvent(baseState(), {
+    feature: "kill",
+    info: { me: { kills: "3", headshots: "2", max_kill_distance: "184.5" } }
+  });
+
+  assert.equal(state.kills, 3);
+  assert.equal(state.headshots, 2);
+  assert.equal(state.maxKillDistance, 184.5);
+
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "kill",
+    info: { me: { total_damage_dealt: "412.8" } }
+  });
+
+  assert.equal(state.headshots, 2);
+  assert.ok(state.ignoredUpdates.some((entry) => entry.indexOf("blocked:total_damage_dealt") === 0));
+  assert.equal(JSON.stringify(state).indexOf("412.8"), -1);
 });
 
 test("roster: 공식 roster_XX payload로 생존자 수를 계산한다", () => {
@@ -341,7 +390,75 @@ test("buildSessionSummary: 서버 스키마에 필요한 필드만 담고 금지
   assert.equal(serialized.indexOf("location"), -1);
 });
 
-test("REQUIRED_FEATURES는 Phase 1 허용 목록과 동일하다", () => {
+test("buildSessionSummary: 사후 분석 연결 필드와 타임라인을 담는다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "match",
+    info: { match_info: { match_id: "match.bro.official.pc-2018-01.steam.squad-fpp.as.2026.08.01.abc", mode: "squad-fpp" } }
+  });
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "map",
+    info: { map_info: { map: "Erangel_Main" } }
+  });
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "kill",
+    info: { me: { kills: "4", headshots: "2", max_kill_distance: "212.75" } }
+  });
+  state = gep.reduceGameEvent(state, "death", "");
+  state = gep.reduceNewEventsEvent(state, {
+    events: [{ name: "killer", data: "{\"killer_name\":\"Ace_Tullis\"}" }]
+  });
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "rank",
+    info: { match_info: { me: "7", total: "96" } }
+  });
+  state = gep.reduceGameEvent(state, "matchEnd", "");
+
+  const summary = gep.buildSessionSummary(state, { version: "0.5.0" }, {
+    playerName: "TestPlayer",
+    platform: "steam"
+  });
+
+  // 공식 API 조회 가능한 match_id 를 따로 담는다.
+  assert.equal(summary.gep_summary.official_match_id.indexOf("match.bro.official"), 0);
+  assert.equal(summary.gep_summary.map_name, "Erangel_Main");
+  assert.equal(summary.gep_summary.headshots, 2);
+  assert.equal(summary.gep_summary.max_kill_distance, 212.75);
+  assert.equal(summary.gep_summary.rank_place, 7);
+  assert.equal(summary.gep_summary.rank_total, 96);
+  assert.equal(summary.gep_summary.last_killer_name, "Ace_Tullis");
+
+  // 타임라인은 최상위 키로 나간다. gep_summary 안이면 서버 스칼라 화이트리스트에 걸린다.
+  assert.ok(Array.isArray(summary.event_timeline));
+  assert.deepEqual(summary.event_timeline.map((entry) => entry.kind), ["death", "killer"]);
+
+  const serialized = JSON.stringify(summary);
+
+  assert.equal(serialized.indexOf("damage"), -1);
+  assert.equal(serialized.indexOf("location"), -1);
+  // 서버 payload 제한(16KB) 대비 여유가 있어야 한다.
+  assert.ok(Buffer.byteLength(serialized) < 4096);
+});
+
+test("buildSessionSummary: pseudo_match_id만 있으면 official_match_id는 비운다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "match_info",
+    info: { match_info: { pseudo_match_id: "0c0ea3df-97ea-4d3a-b1f6-f8e34042251f" } }
+  });
+  state = gep.reduceGameEvent(state, "matchEnd", "");
+
+  const summary = gep.buildSessionSummary(state, {});
+
+  // pseudo_match_id 는 Overwolf 생성값이라 공식 API 조회 키로 쓸 수 없다.
+  assert.equal(summary.gep_summary.official_match_id, null);
+  assert.equal(summary.pseudo_match_id, "0c0ea3df-97ea-4d3a-b1f6-f8e34042251f");
+  assert.equal(summary.gep_summary.effective_match_id, "0c0ea3df-97ea-4d3a-b1f6-f8e34042251f");
+});
+
+test("REQUIRED_FEATURES는 허용 목록과 동일하다", () => {
   assert.deepEqual(gep.REQUIRED_FEATURES, [
     "match",
     "match_info",
@@ -351,8 +468,15 @@ test("REQUIRED_FEATURES는 Phase 1 허용 목록과 동일하다", () => {
     "revived",
     "killer",
     "roster",
-    "me"
+    "me",
+    "rank",
+    "map"
   ]);
+
+  // 금지 feature 가 구독 목록에 섞여 들어가지 않는지 확인한다.
+  ["location", "team", "counters"].forEach((feature) => {
+    assert.equal(gep.REQUIRED_FEATURES.indexOf(feature), -1);
+  });
 });
 
 test("isServiceDegraded: 경고 라인 표시 기준을 한 곳에서 판정한다", () => {
@@ -373,4 +497,85 @@ test("isServiceDegraded: 경고 라인 표시 기준을 한 곳에서 판정한�
   // reduceServiceStatus / reduceGepError 를 거친 실제 상태에서도 같은 판정이 나와야 한다.
   assert.equal(gep.isServiceDegraded(gep.reduceServiceStatus(state, { game_id: 10906, state: 2 })), true);
   assert.equal(gep.isServiceDegraded(gep.reduceGepError(state, { reason: "provider disconnected" })), true);
+});
+
+test("eventTimeline: 사후 리뷰용으로 이벤트 시점을 기록하고 좌표는 담지 않는다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  state = gep.reduceGameEvent(state, "kill", "");
+  state = gep.reduceGameEvent(state, "knockedout", "");
+  state = gep.reduceGameEvent(state, "revived", "");
+  state = gep.reduceGameEvent(state, "death", "");
+  state = gep.reduceNewEventsEvent(state, {
+    events: [{ name: "killer", data: "{\"killer_name\":\"Ace_Tullis\"}" }]
+  });
+
+  assert.deepEqual(state.eventTimeline.map((entry) => entry.kind), [
+    "kill",
+    "knockedout",
+    "revived",
+    "death",
+    "killer"
+  ]);
+
+  // 경과 초는 matchStart 기준이며 음수가 아니어야 한다.
+  state.eventTimeline.forEach((entry) => {
+    assert.equal(typeof entry.t, "number");
+    assert.ok(entry.t >= 0);
+  });
+
+  // killer 만 상대 닉네임을 detail 로 남긴다.
+  assert.equal(state.eventTimeline[4].detail, "Ace_Tullis");
+  assert.equal(state.eventTimeline[0].detail, undefined);
+
+  // 좌표 계열 키가 타임라인에 섞이지 않는다.
+  const serialized = JSON.stringify(state.eventTimeline);
+
+  assert.equal(serialized.indexOf("location"), -1);
+  assert.equal(serialized.indexOf("damage"), -1);
+});
+
+test("eventTimeline: matchStart 이전 이벤트는 경과 초를 null로 남긴다", () => {
+  const state = gep.reduceGameEvent(baseState(), "death", "");
+
+  assert.equal(state.eventTimeline.length, 1);
+  assert.equal(state.eventTimeline[0].t, null);
+});
+
+test("eventTimeline: 최대 항목 수를 넘으면 더 쌓지 않는다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  for (let i = 0; i < gep.MAX_TIMELINE_ENTRIES + 15; i += 1) {
+    state = gep.reduceGameEvent(state, "kill", "");
+  }
+
+  assert.equal(state.eventTimeline.length, gep.MAX_TIMELINE_ENTRIES);
+  // 카운터 자체는 계속 증가한다. 타임라인 상한이 킬 집계를 막지 않는다.
+  assert.equal(state.kills, gep.MAX_TIMELINE_ENTRIES + 15);
+});
+
+test("matchStart: 타임라인과 순위는 초기화하되 맵 이름은 유지한다", () => {
+  let state = gep.reduceInfoUpdatesEvent(baseState(), {
+    feature: "map",
+    info: { map_info: { map: "Miramar_Main" } }
+  });
+
+  state = gep.reduceGameEvent(state, "matchStart", "");
+  state = gep.reduceGameEvent(state, "kill", "");
+  state = gep.reduceInfoUpdatesEvent(state, {
+    feature: "rank",
+    info: { match_info: { me: "12", total: "97" } }
+  });
+
+  assert.equal(state.eventTimeline.length, 1);
+  assert.equal(state.rankPlace, 12);
+
+  // 다음 매치가 시작되면 순위와 타임라인은 비우고 맵 이름은 남긴다.
+  state = gep.reduceGameEvent(state, "matchStart", "");
+
+  assert.equal(state.eventTimeline.length, 0);
+  assert.equal(state.rankPlace, null);
+  assert.equal(state.rankTotal, null);
+  assert.equal(state.headshots, 0);
+  assert.equal(state.mapName, "Miramar_Main");
 });

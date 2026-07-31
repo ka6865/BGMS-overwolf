@@ -1,6 +1,6 @@
 {
   "name": "bgms-overwolf-app",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "description": "BGMS Companion Overwolf app (PUBG GEP overlay). Tests cover the pure GEP reducer, session queue, settings store, and background wiring.",
   "scripts": {

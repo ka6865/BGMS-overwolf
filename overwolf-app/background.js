@@ -27,6 +27,8 @@
   // 개발 하네스에서 로컬 서버로 붙여 검증할 때만 window.bgmsDevEndpoint로 덮어쓴다.
   // Overwolf 런타임에는 이 값이 존재하지 않으므로 항상 운영 엔드포인트를 사용한다.
   var SESSION_ENDPOINT = window.bgmsDevEndpoint || "https://bgms.kr/api/overwolf/session";
+  // 사용자가 데스크탑 창에서 세션 기록을 열 때 사용하는 웹 경로.
+  var SESSION_WEB_BASE = window.bgmsDevWebBase || "https://bgms.kr/overwolf/sessions";
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
   var QUEUE_TICK_MS = 30000;
 
@@ -716,6 +718,36 @@
   window.bgmsController = {
     getState: cloneState,
     subscribe: subscribe,
+    /*
+     * BGMS 웹의 세션 기록 화면을 기본 브라우저로 연다.
+     * 사용자가 앱에 입력한 닉네임/플랫폼을 쿼리로 붙여 바로 자기 기록이 보이게 한다.
+     * overwolf.utils.openUrlInDefaultBrowser 는 별도 permission 을 요구하지 않는다.
+     */
+    openSessionHistory: function () {
+      var settings = settingsStore.read();
+      var url = SESSION_WEB_BASE;
+      var query = [];
+
+      if (settings.playerName) {
+        query.push("player=" + encodeURIComponent(settings.playerName));
+      }
+
+      if (settings.platform) {
+        query.push("platform=" + encodeURIComponent(settings.platform));
+      }
+
+      if (query.length) {
+        url += "?" + query.join("&");
+      }
+
+      if (!hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
+        return null;
+      }
+
+      overwolf.utils.openUrlInDefaultBrowser(url);
+
+      return url;
+    },
     showOverlay: function () {
       setOverlayVisible(true);
     },

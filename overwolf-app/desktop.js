@@ -153,6 +153,7 @@
     var enabledInput = document.getElementById("handoff-enabled");
     var nameInput = document.getElementById("handoff-player-name");
     var retryButton = document.getElementById("handoff-retry");
+    var historyButton = document.getElementById("open-session-history");
 
     if (enabledInput) {
       enabledInput.addEventListener("change", function () {
@@ -184,6 +185,17 @@
 
         if (controller && typeof controller.retryHandoff === "function") {
           controller.retryHandoff();
+        }
+      });
+    }
+
+    // BGMS 웹 세션 기록을 기본 브라우저로 연다. 앱 안에서 웹을 렌더링하지 않는다.
+    if (historyButton) {
+      historyButton.addEventListener("click", function () {
+        var controller = getController();
+
+        if (controller && typeof controller.openSessionHistory === "function") {
+          controller.openSessionHistory();
         }
       });
     }
@@ -319,6 +331,7 @@
     if (!state) {
       // 컨트롤러가 아직 없어도(미리보기/기동 직전) 전송 설정 상태는 보여줄 수 있다.
       setText("handoff-status", describeHandoff({}));
+      updateDiagnosticsDisclosure(null);
       return;
     }
 
@@ -344,6 +357,42 @@
     setText("desktop-handoff", describeHandoff(state));
     setText("desktop-required-result", state.lastRequiredFeaturesResult || "--");
     setText("handoff-status", describeHandoff(state));
+    updateDiagnosticsDisclosure(state);
+  }
+
+  /*
+   * 진단 패널은 기본 접힘이다. 서비스 경고나 GEP 오류가 감지되면 한 번 펼치고,
+   * 사용자가 직접 접은 뒤에는 다시 강제로 펼치지 않는다.
+   */
+  var diagnosticsAutoOpened = false;
+
+  function updateDiagnosticsDisclosure(state) {
+    var disclosure = document.getElementById("diagnostics-disclosure");
+    var hint = document.getElementById("diagnostics-hint");
+    var t = window.bgmsI18n.translate;
+    var degraded = Boolean(state) && Boolean(window.bgmsGepState)
+      && window.bgmsGepState.isServiceDegraded(state);
+
+    if (hint) {
+      hint.textContent = degraded
+        ? (state.gepErrorReason || t("diagnosticsAttention"))
+        : t("diagnosticsIdle");
+      hint.classList.toggle("is-warning", degraded);
+    }
+
+    if (!disclosure) {
+      return;
+    }
+
+    if (degraded && !diagnosticsAutoOpened) {
+      disclosure.open = true;
+      diagnosticsAutoOpened = true;
+      return;
+    }
+
+    if (!degraded) {
+      diagnosticsAutoOpened = false;
+    }
   }
 
   function bindRefreshButton() {

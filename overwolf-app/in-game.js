@@ -4,6 +4,10 @@
   var previewState = {
     phase: "Preview",
     kills: 2,
+    headshots: 1,
+    maxKillDistance: 143.5,
+    rankPlace: null,
+    rankTotal: null,
     alivePlayers: null,
     health: 74,
     koHealth: 100,
@@ -34,11 +38,12 @@
   function queryElements() {
     elements.matchState = document.getElementById("match-state");
     elements.phase = document.getElementById("phase");
-    elements.kills = document.getElementById("kills");
-    elements.alive = document.getElementById("alive");
-    elements.aliveItem = document.getElementById("alive-item");
-    elements.health = document.getElementById("health");
-    elements.healthItem = document.getElementById("health-item");
+    elements.headshots = document.getElementById("headshots");
+    elements.headshotItem = document.getElementById("headshot-item");
+    elements.longestKill = document.getElementById("longest-kill");
+    elements.longestItem = document.getElementById("longest-item");
+    elements.rankPlace = document.getElementById("rank-place");
+    elements.rankItem = document.getElementById("rank-item");
     elements.knockedFlag = document.getElementById("knocked-flag");
     elements.weaponState = document.getElementById("weapon-state");
     elements.lastEvent = document.getElementById("last-event");
@@ -121,6 +126,20 @@
     }
   }
 
+  /*
+   * max_kill_distance 는 소수점이 붙은 미터 값으로 온다.
+   * 좁은 HUD 에서 자릿수가 흔들리지 않게 정수 미터로 줄인다.
+   */
+  function formatDistance(value) {
+    var meters = Math.round(Number(value));
+
+    if (!Number.isFinite(meters)) {
+      return "--";
+    }
+
+    return String(meters) + "m";
+  }
+
   function render(state) {
     var t = window.bgmsI18n.translate;
     var matchLabel = state.matchEnded
@@ -131,8 +150,12 @@
           ? t("waitingForMatch")
           : t("waitingForPubg");
     var phaseLabel = state.phase ? translatePhase(state.phase) : t("idle");
-    var hasAlive = state.alivePlayers !== null && state.alivePlayers !== undefined;
-    var hasHealth = state.health !== null && state.health !== undefined;
+    /*
+     * 표시 항목은 배그 기본 HUD가 보여주지 않는 값만 남긴다.
+     * 킬 수, 생존자 수, 체력, 무기 상태는 게임 화면에 이미 있어 중복 표시하지 않는다.
+     */
+    var hasLongestKill = state.maxKillDistance !== null && state.maxKillDistance !== undefined;
+    var hasRank = state.rankPlace !== null && state.rankPlace !== undefined;
     // 경고 판정은 리듀서와 background 창 높이 계산이 같은 기준을 쓰도록 gep-state 에 둔다.
     var isDegraded = window.bgmsGepState
       ? window.bgmsGepState.isServiceDegraded(state)
@@ -149,11 +172,14 @@
 
     setText(elements.matchState, matchLabel);
     setText(elements.phase, phaseLabel);
-    setText(elements.kills, String(state.kills || 0));
-    setText(elements.alive, hasAlive ? String(state.alivePlayers) : "--");
-    setText(elements.health, hasHealth ? String(state.health) : "--");
-    toggleHidden(elements.aliveItem, !hasAlive);
-    toggleHidden(elements.healthItem, !hasHealth);
+    setText(elements.headshots, String(state.headshots || 0));
+    setText(elements.longestKill, hasLongestKill ? formatDistance(state.maxKillDistance) : "--");
+    setText(elements.rankPlace, hasRank
+      ? String(state.rankPlace) + (state.rankTotal ? "/" + String(state.rankTotal) : "")
+      : "--");
+    toggleHidden(elements.longestItem, !hasLongestKill);
+    // 순위는 매치 종료 시점에만 오므로 값이 있을 때만 노출한다.
+    toggleHidden(elements.rankItem, !hasRank);
     toggleHidden(elements.knockedFlag, !state.knocked);
     setText(elements.weaponState, state.weaponState || t("weaponUnknown"));
     setText(elements.lastEvent, state.lastEvent || t("noLiveEvents"));

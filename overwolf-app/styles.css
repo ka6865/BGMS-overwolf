@@ -337,6 +337,63 @@ input[type="range"] {
   accent-color: var(--mint);
 }
 
+/*
+ * 진단은 개발/문제 해결용이라 기본 접힘이다.
+ * 서비스 경고나 GEP 오류가 있을 때 desktop.js 가 자동으로 펼친다.
+ */
+.diagnostics-disclosure summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.diagnostics-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 접힘/펼침 방향을 나타내는 삼각형을 직접 그린다. */
+.diagnostics-disclosure summary::before {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--muted);
+  content: "";
+  transform: translateY(-1px);
+}
+
+.diagnostics-disclosure[open] summary::before {
+  border-top: 5px solid var(--muted);
+  border-right: 4px solid transparent;
+  border-bottom: 0;
+  border-left: 4px solid transparent;
+}
+
+.diagnostics-disclosure summary h2 {
+  margin: 0;
+}
+
+.diagnostics-disclosure summary:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+
+.diagnostics-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 문제가 감지되면 힌트를 경고색으로 바꿔 펼칠 이유를 알린다. */
+.diagnostics-hint.is-warning {
+  color: var(--amber);
+}
+
+.diagnostics-disclosure[open] .diagnostics-list {
+  margin-top: 14px;
+}
+
 .diagnostics-list {
   display: grid;
   /* 진단 항목이 14개라 1열로 쌓으면 기본 창 높이(700px)를 혼자 넘긴다.
@@ -511,6 +568,29 @@ input[type="range"] {
   font: inherit;
   font-size: 12px;
   cursor: pointer;
+}
+
+/* 버튼 두 개를 한 줄에 두되 좁아지면 줄바꿈한다. */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-row .text-button {
+  margin-top: 10px;
+}
+
+/* 주된 행동(웹 기록 열기)을 시각적으로 구분한다. */
+.text-button.is-primary {
+  border-color: rgba(94, 227, 161, 0.6);
+  background: rgba(94, 227, 161, 0.18);
+  color: var(--mint);
+  font-weight: 700;
+}
+
+.text-button.is-primary:hover {
+  background: rgba(94, 227, 161, 0.28);
 }
 
 .text-button:hover {

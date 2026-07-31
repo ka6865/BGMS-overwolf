@@ -130,6 +130,33 @@ Measured after the fixes:
 
 Not verified: real PUBG rendering. All of the above is headless Chrome plus computed CSS, not the Overwolf client compositor.
 
+## Phase 1.5 / 2 / 3 Verification (2026-08-01)
+
+### Automated
+
+- App: 66 tests pass (`npm test`). New coverage: `rank` vs `me` feature split in both directions, `map` name handling with `location` still blocked, `headshots` / `max_kill_distance` collection with `total_damage_dealt` rejected, timeline ordering and cap, `matchStart` reset behaviour (timeline and rank cleared, map name kept), summary fields including `official_match_id`, and the session-history link builder.
+- Server: 43 tests pass (`npm run verify:overwolf`, now covering `tests/overwolf-session.test.ts` and `tests/overwolf-session-view.test.ts`). New coverage: timeline normalization (allowed kinds only, invalid seconds nulled, cap enforced, non-array tolerated, blocked fields rejecting the whole payload), the extended summary whitelist, the read route (list, single, 400 on short nickname, limit clamp, 404, no internal fields, 503 without config), and migration invariants.
+- `npx tsc --noEmit` reports no errors. `npx eslint app/api/overwolf lib/overwolf components/overwolf app/overwolf` is clean.
+
+### Against the live database
+
+Migration `20260801080000_overwolf_gep_session_timeline.sql` was applied to production and checked directly:
+
+- `event_timeline jsonb NOT NULL DEFAULT '[]'` exists on `overwolf_session_events`.
+- All five Overwolf functions have ACL `postgres=X`, `service_role=X` only. The old nine-argument `record_overwolf_session_event` is gone, so there is no ambiguous overload.
+- First insert returns `true`; the same `session_id` returns `false` and does not overwrite the stored summary or timeline.
+- A non-array `event_timeline` (`"not-an-array"`) is stored as `[]` rather than rejected, so a malformed client cannot lose the whole summary.
+- `list_overwolf_sessions('PHASE3PLAYER', 'steam', 20)` normalizes the uppercase nickname and returns the row.
+- With three rows for one player, one marked `is_internal = true`, the list returns two. Querying the wrong platform returns zero.
+- End to end through a local server against the production database: `GET /api/overwolf/sessions` returns the normalized view with `durationSeconds` 1470 and the correct `canOpenAnalysis` value.
+- The web view renders the list, per-session stats, and the expanded timeline as `1:30 기절 / 7:00 처치 / 24:30 가해자 Ace_Tullis`, sorted by elapsed time. No horizontal overflow at 1280 or 390 px.
+- All verification rows and quota keys were deleted. Both tables are back to 0 rows.
+
+### Not verified
+
+- `https://bgms.kr/api/overwolf/sessions` and `/overwolf/sessions` still return 404. The read route is not deployed yet, so the desktop window's session-history button will fail against production until the BGMS repository ships.
+- Whether a live PUBG match actually emits `match_id`, `rank`, `map`, `headshots`, and `max_kill_distance`. Everything above used synthetic payloads shaped after the official documentation tables.
+
 ## Observed vs Official (keep separated)
 
 - Official phase list has no `starting`, but `starting` was observed in real gameplay (2026-07-08).

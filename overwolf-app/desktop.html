@@ -57,7 +57,10 @@
           </div>
 
           <p class="handoff-status" id="handoff-status" role="status"></p>
-          <button type="button" id="handoff-retry" class="text-button" data-i18n="handoffRetry">Retry pending handoff</button>
+          <div class="button-row">
+            <button type="button" id="handoff-retry" class="text-button" data-i18n="handoffRetry">Retry pending handoff</button>
+            <button type="button" id="open-session-history" class="text-button is-primary" data-i18n="openSessionHistory">Open my session history</button>
+          </div>
         </article>
 
         <article class="panel settings-panel">
@@ -90,8 +93,12 @@
         </article>
 
         <article class="panel diagnostics-panel">
-          <h2 data-i18n="diagnosticsTitle">Live diagnostics</h2>
-          <dl class="diagnostics-list">
+          <details class="diagnostics-disclosure" id="diagnostics-disclosure">
+            <summary>
+              <h2 data-i18n="diagnosticsTitle">Live diagnostics</h2>
+              <span class="diagnostics-hint" id="diagnostics-hint" data-i18n="diagnosticsIdle">No issues detected</span>
+            </summary>
+            <dl class="diagnostics-list">
             <div>
               <dt data-i18n="gepStatusLabel">GEP status</dt>
               <dd id="desktop-gep-status">--</dd>
@@ -148,8 +155,9 @@
               <dt data-i18n="requiredResultLabel">Required result</dt>
               <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
             </div>
-          </dl>
-          <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
+            </dl>
+            <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
+          </details>
         </article>
       </section>
 
@@ -178,6 +186,7 @@
 
     <script src="i18n.js"></script>
     <script src="settings.js"></script>
+    <script src="gep-state.js"></script>
     <script src="desktop.js"></script>
   </body>
 </html>

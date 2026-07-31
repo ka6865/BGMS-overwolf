@@ -379,3 +379,39 @@ test("서비스 경고가 뜨면 mini 오버레이 높이가 경고 줄만큼 �
 
   assert.equal(sandbox.mockGep.windowSizeCalls().length, 0);
 });
+
+test("openSessionHistory: 닉네임과 플랫폼을 붙여 BGMS 웹 세션 기록을 연다", () => {
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "TestPlayer", platform: "kakao" }
+  });
+
+  const url = sandbox.bgmsController.openSessionHistory();
+  const opened = sandbox.mockGep.openedUrls();
+
+  assert.equal(opened.length, 1);
+  assert.equal(opened[0], url);
+  assert.equal(url.indexOf("https://bgms.kr/overwolf/sessions?"), 0);
+  assert.ok(url.indexOf("player=TestPlayer") !== -1);
+  assert.ok(url.indexOf("platform=kakao") !== -1);
+});
+
+test("openSessionHistory: 닉네임이 없으면 쿼리 없이 기본 경로를 연다", () => {
+  const sandbox = createSandbox();
+
+  const url = sandbox.bgmsController.openSessionHistory();
+
+  assert.equal(url, "https://bgms.kr/overwolf/sessions?platform=steam");
+  assert.equal(sandbox.mockGep.openedUrls().length, 1);
+});
+
+test("openSessionHistory: BGMS 세션 경로 외의 도메인은 열지 않는다", () => {
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "TestPlayer", platform: "steam" }
+  });
+
+  sandbox.bgmsController.openSessionHistory();
+
+  sandbox.mockGep.openedUrls().forEach((opened) => {
+    assert.equal(opened.indexOf("https://bgms.kr/"), 0);
+  });
+});

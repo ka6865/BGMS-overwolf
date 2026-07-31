@@ -1,41 +1,43 @@
 # BGMS Companion Overwolf App
 
-This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submission preparation. The client, the BGMS receiving endpoint, and the database table are all live; the remaining launch work is Overwolf-side submission, not code.
+This folder contains the Overwolf app for BGMS review and Overwolf submission preparation. Phases 1, 1.5, 2, and the first step of Phase 3 are implemented. The client, the BGMS receiving and reading endpoints, the database schema, and the web session view are all in place.
 
-## Release Readiness (2026-07-31)
+## Release Readiness (2026-08-01)
 
 Done and verified:
 
 - `POST https://bgms.kr/api/overwolf/session` is deployed. Smoke-tested against the production domain: 200 `stored:true`, 200 `duplicate:true` on resend, 422 for `damage_dealt`, 400 for an empty body, 204 + CORS for `OPTIONS`, 405 for `GET`. Test rows were deleted afterwards.
 - `overwolf_session_events` and `overwolf_session_quota` exist in the production database with RLS on and `anon` grants revoked.
+- `event_timeline` column and the read RPCs (`list_overwolf_sessions`, `get_overwolf_session`) are applied to the production database. All five Overwolf functions grant EXECUTE to `service_role` only; the old nine-argument insert signature was dropped.
+- The web session view renders against a local server backed by the production database: list, per-session stats, expandable engagement timeline, and the analysis link. No horizontal overflow at 1280 or 390 px.
 - 90-day retention is wired into the daily cleanup job in the BGMS repository.
-- 52 app tests, 18 server route tests, 8 migration DB scenarios pass.
+- 66 app tests, 43 server tests, 8 migration DB scenarios pass.
 
 Not done, required before a public listing:
 
+- Deploy the new read route. `https://bgms.kr/api/overwolf/sessions` and `/overwolf/sessions` return 404 until the BGMS repository ships. The app's "open my session history" button will fail until then.
 - Real-game confirmation that `me`, `roster`, and `knockedout` updates arrive during a live PUBG match. Only the simulator and mock harness paths are confirmed.
+- Real-game confirmation that `match_id` is emitted, and that its value resolves against the official PUBG API. Post-match analysis linking depends on it; a session with only `pseudo_match_id` is shown without an analysis link by design.
 - `.opk` packaging on Windows and a re-check of unpacked-only limitations.
-- Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots.
+- Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots. The listing copy and screenshots must be redone for the reworked overlay.
 
 Deliberately deferred to Phase 2 (needs separate approval):
 
-- Reading the stored summaries anywhere on `bgms.kr`. Nothing on the website consumes `overwolf_session_events` yet, and the app has no deep link into a BGMS session view. Handoff currently writes to the table and stops there.
+- Linking a session to that specific match's telemetry map analysis. The session view currently links to the player's stats page, not to a per-match map replay.
 - Automatically triggering the BGMS analysis pipeline from a stored summary.
-
-Open product question (see `docs/extension-roadmap.md`, "사용자 가치 기준"):
-
-A competitor review on 2026-08-01 found that most of what the overlay currently shows (kills, alive count, health, weapon state, kill notices) is already on PUBG's built-in HUD and kill feed, and that the desktop window's main surface is a 14-field diagnostics panel meant for development. Statsly already covers free match history and post-match stats, and PUBG's featured Match Bar uses the same live-session-to-post-match architecture as this app. The roadmap now tracks a Phase 1.5 pass to replace duplicated HUD fields with data the game does not show (`headshots`, `max_kill_distance`, `rank`, `map`) and to collapse diagnostics by default. Deciding this before the store submission matters, because it changes the listing copy and screenshots.
 
 ## Scope
 
 - Default language: English (Korean is an optional local setting)
 - Target game: PUBG, base game id `10906`
-- GEP features: `match`, `match_info`, `phase`, `kill`, `death`, `revived`, `killer`, `roster`, `me`
-- In-game UI only: match state, phase, kills, alive count, health (with KO flag), weapon state, latest local event, degraded-service warning
+- GEP features: `match`, `match_info`, `phase`, `kill`, `death`, `revived`, `killer`, `roster`, `me`, `rank`, `map`
+- In-game overlay shows only what PUBG does not: headshot count, longest kill distance, final placement, KO flag, phase, latest local event, degraded-service warning. Kills, alive count, health, and weapon state are collected but not displayed, because the game's own HUD and kill feed already show them.
 - GEP subscription owner: `background.js`
 - GEP payload parsing owner: `gep-state.js` (pure module, unit tested)
 - In-game window role: render state from the background controller only
 - Post-match session summary handoff: live against `https://bgms.kr/api/overwolf/session`, opt-in per user
+- Post-match review: `death`, `killer`, `knockedout`, `revived`, and `kill` timestamps travel with the summary and render on the BGMS web session view
+- Web session view: `https://bgms.kr/overwolf/sessions`, opened from the desktop window through `overwolf.utils.openUrlInDefaultBrowser`
 
 ## Session Handoff
 

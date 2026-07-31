@@ -322,3 +322,61 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 자동으로 "게임이 없는 모니터"에 창을 배치하는 것은 `getMonitorsList`가 필요하고 이는 별도 권한을 요구한다. 심사 시 권한 설명 부담이 늘어나므로 지금은 구현하지 않았다. 대신 `native_window` + `keep_window_location` 조합으로 사용자가 직접 옮긴 위치가 유지되게 했다.
 
 검증 상태: manifest 플래그 적용과 여러 해상도에서의 레이아웃(760x520 ~ 2560x1440, 세로 모니터)은 확인했다. 실제 Overwolf 클라이언트에서 창이 보조 모니터로 분리되는지는 Windows 실환경 확인이 필요하다.
+
+## Phase 1.5 / 2 / 3 구현 반영 (2026-08-01)
+
+### 구독 feature 확장
+
+`rank`와 `map`을 구독 목록에 추가했다. 총 11종이다.
+
+- `rank`: 공식 문서상 info key는 `match_info.me`(순위)와 `match_info.total`(총원)이며 **값이 문자열로 온다**(예: `"38"`, `"98"`). key 이름 `me`가 `me` feature와 겹치므로 반드시 feature 기준으로 분기한다. `gep-state.js`의 `applyRank`가 이를 담당한다.
+- `map`: 맵 이름만 사용한다. GEP는 `Erangel_Main` 같은 내부 코드로 준다. 좌표나 미니맵으로 연결하지 않는다.
+- `kill` feature에서 `headshots`와 `max_kill_distance`를 추가로 수집한다. 둘 다 누적값이다. `total_damage_dealt`와 `damage_dealt`는 계속 차단한다.
+
+`map`은 매치 간 유지하고 `rank`는 초기화한다. 맵은 로비/로딩 단계에서 먼저 도착할 수 있고 순위는 매치 종료 시점 값이기 때문이다.
+
+### 오버레이 표시 항목 재편
+
+배그 기본 HUD와 킬피드가 이미 보여주는 항목(킬 수, 생존자 수, 체력, 무기 상태)을 HUD에서 제거하고, 게임이 매치 중 보여주지 않는 항목으로 교체했다.
+
+- 표시: 헤드샷 수, 최장 킬 거리, 최종 순위(종료 시에만), KO 플래그, 페이즈
+- 리듀서는 제거한 값도 계속 수집한다. 세션 요약과 사후 분석에는 필요하다.
+- 실측: 최악 케이스(순위 + KO + 3자리 거리 + Loading 페이즈)에서 334px/334px로 넘침 없음.
+
+데스크탑 진단 패널은 `<details>` 기반 기본 접힘으로 바꿨다. `isServiceDegraded`가 true가 되면 한 번 자동으로 펼치고, 사용자가 접은 뒤에는 강제로 다시 펼치지 않는다.
+
+### 사후 리뷰 타임라인 (Phase 3)
+
+`death`, `killer`, `knockedout`, `revived`, `kill` 발생 시점을 세션 요약에 담는다.
+
+- 항목 구조는 `{ t: 경과초, kind: 종류, detail?: 상대닉네임 }`이다. **좌표와 데미지는 담지 않는다.**
+- 경과 초는 `matchStart` 기준이다. 시작 시각을 모르면 `null`로 남겨 웹이 위치를 추정하지 않게 한다.
+- 최대 40건으로 제한한다. 서버 16KB 제한 대비 여유를 두기 위한 값이며 클라이언트와 서버 상한이 같아야 한다.
+- `gep_summary` 안이 아니라 payload 최상위 `event_timeline` 키로 보낸다. `gep_summary`는 서버에서 스칼라만 허용하는 화이트리스트를 통과하므로 배열을 담을 수 없다.
+
+### 서버 조회 경로 (Phase 2)
+
+`app/api/overwolf/sessions/route.ts`(GET)를 추가했다. 적재 경로와 분리된 읽기 전용 라우트다.
+
+- `list_overwolf_sessions(player_id, platform, limit)`와 `get_overwolf_session(session_id)` RPC를 쓴다. 둘 다 `SECURITY DEFINER`이고 EXECUTE는 `service_role`만 갖는다.
+- RPC가 `source_host`와 `is_internal`을 반환 컬럼에서 제외한다. 목록은 `is_internal = false`만 노출한다.
+- `player_id`는 사용자가 앱에 직접 입력한 값이며 인증된 identity가 아니다. 따라서 이 경로는 비공개 데이터를 다루지 않는다는 전제로만 성립한다. 적재되는 값이 GEP 카운터와 이벤트 시점뿐이고 위치/데미지/개인정보가 없어 성립한다. 열거를 어렵게 하려고 닉네임 최소 3자와 조회 상한 50건을 둔다.
+
+### 앱에서 웹으로 나가는 경로
+
+`overwolf.utils.openUrlInDefaultBrowser`를 사용한다. 이 API는 별도 permission을 요구하지 않아 manifest 권한이 늘지 않았다. 데스크탑 창의 "내 세션 기록 열기" 버튼이 `https://bgms.kr/overwolf/sessions?player=...&platform=...`을 기본 브라우저로 연다. 앱 안에서 웹을 렌더링하지 않는다.
+
+### 실 DB 검증 결과 (2026-08-01)
+
+마이그레이션 `20260801080000_overwolf_gep_session_timeline.sql`을 운영 DB에 적용하고 확인했다.
+
+- `event_timeline jsonb NOT NULL DEFAULT '[]'` 컬럼 추가 확인
+- 함수 5종 모두 ACL이 `postgres=X`, `service_role=X`뿐이다. 옛 9인자 `record_overwolf_session_event`는 제거됐다
+- 첫 적재 `true`, 같은 `session_id` 재적재 `false`(기존 요약 보존)
+- 배열이 아닌 타임라인(`"not-an-array"`)은 빈 배열로 방어됨
+- `list_overwolf_sessions('PHASE3PLAYER', ...)`가 대문자 입력을 소문자로 정규화해 조회함
+- 전체 3행 중 `is_internal = true` 1행이 목록에서 제외됨(2행 노출), 잘못된 플랫폼 조회는 0행
+- 로컬 서버 종단: `GET /api/overwolf/sessions`가 정규화된 뷰를 반환하고 `durationSeconds` 1470, `canOpenAnalysis` 계산 확인
+- 검증 데이터는 모두 삭제해 두 테이블 0행 복구
+
+운영 도메인 `https://bgms.kr/api/overwolf/sessions`는 아직 404다. 새 라우트가 배포되지 않았기 때문이며 배포 후 스모크가 필요하다.
