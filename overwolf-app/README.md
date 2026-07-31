@@ -21,10 +21,10 @@ Not done, required before a public listing:
 - `.opk` packaging on Windows and a re-check of unpacked-only limitations.
 - Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots. The listing copy and screenshots must be redone for the reworked overlay.
 
-Deliberately deferred to Phase 2 (needs separate approval):
+Deliberately deferred (needs separate approval):
 
-- Linking a session to that specific match's telemetry map analysis. The session view currently links to the player's stats page, not to a per-match map replay.
 - Automatically triggering the BGMS analysis pipeline from a stored summary.
+- Video and screenshot capture (`media` / `media.replays` permissions).
 
 ## Scope
 
@@ -37,6 +37,7 @@ Deliberately deferred to Phase 2 (needs separate approval):
 - In-game window role: render state from the background controller only
 - Post-match session summary handoff: live against `https://bgms.kr/api/overwolf/session`, opt-in per user
 - Post-match review: `death`, `killer`, `knockedout`, `revived`, and `kill` timestamps travel with the summary and render on the BGMS web session view
+- Map replay entry: the web session view extracts the UUID from the GEP `match_id` and opens BGMS's existing telemetry map replay at that match, and each timeline entry links to its own moment
 - Web session view: `https://bgms.kr/overwolf/sessions`, opened from the desktop window through `overwolf.utils.openUrlInDefaultBrowser`
 
 ## Session Handoff

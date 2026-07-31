@@ -393,3 +393,26 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 1280px과 390px에서 가로 넘침 없음, 분석 링크는 공식 match id가 있는 세션 1건에만 노출
 
 스모크 행과 쿼터 키는 모두 삭제해 두 테이블 0행이다.
+
+## GEP match_id 와 BGMS 텔레메트리 id 관계 (2026-08-01 확인)
+
+**핵심 사실**: GEP `match_id` 문자열 끝의 UUID 구간이 BGMS 텔레메트리 `match_id` 와 동일하다.
+
+- GEP: `match.bro.official.pc-2018-03.steam.solo.eu.2019.05.07.08.ce8d1a14-b2af-41c8-8bf4-d2a504326630`
+- BGMS `match_master_telemetry.match_id`: `3462da2c-8f01-468d-96df-cb00cb5cd713` (UUID 단독)
+
+즉 BGMS 는 같은 매치를 뒤쪽 UUID 만으로 저장한다. 따라서 GEP 값에서 UUID 를 추출하면 기존 `/replay/3d` 화면에 그대로 넘길 수 있다. `lib/overwolf/session-view.ts` 의 `extractTelemetryMatchId` 가 이 변환을 담당한다.
+
+주의할 점:
+
+- UUID 형식을 만족하지 못하면 `null` 을 반환해 잘못된 id 로 리플레이를 열지 않는다.
+- `pseudo_match_id` 는 UUID 형태지만 Overwolf 생성값이므로 이 경로에 넣지 않는다. `official_match_id` 에서만 추출한다.
+- 리플레이는 `matchId` 와 `nickname` 이 모두 있어야 열린다. BGMS 텔레메트리가 플레이어 단위로 저장되기 때문이다.
+
+### 리플레이 진입 시점 (`t` 파라미터)
+
+`/replay/3d?matchId=...&nickname=...&platform=...&t=420` 형태로 교전 시점(초)을 넘긴다. `parseReplayStartMs` 가 파싱하고 `resolveReplaySeekMs` 가 재생 위치를 정한다. 텔레메트리 로드가 끝나 재생 구간과 플레이어가 채워진 뒤에만 적용한다.
+
+`t` 는 GEP `matchStart` 기준 경과 초이고 텔레메트리 타임라인 기준과 완전히 같지 않다. 정확한 프레임이 아니라 "그 무렵" 으로 데려가는 용도다.
+
+검증 제약: 로컬(`localhost:3100`)에서는 R2 CORS 가 허용되지 않아 텔레메트리 페치가 `ERR_FAILED` 로 막힌다. 따라서 리플레이 화면의 실제 시점 이동은 로컬 브라우저로 확인할 수 없고, 순수 함수 단위 테스트와 배포 환경 확인으로 나눠 검증한다. 텔레메트리 API 자체는 로컬에서 200 을 반환한다.
