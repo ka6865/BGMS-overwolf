@@ -20,7 +20,15 @@ Not done, required before a public listing:
 - Real-game confirmation that `me`, `roster`, and `knockedout` updates arrive during a live PUBG match. Only the simulator and mock harness paths are confirmed.
 - Real-game confirmation that `match_id`, `rank`, `map`, `headshots`, and `max_kill_distance` are emitted, and that `match_id` resolves against the official PUBG API. Post-match analysis linking depends on `match_id`; a session with only `pseudo_match_id` is shown without an analysis link by design.
 - `.opk` packaging on Windows and a re-check of unpacked-only limitations.
-- Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots. The listing copy and screenshots must be redone for the reworked overlay.
+- One screenshot of the overlay composited over actual PUBG gameplay. Four 1920x1080 screenshots are ready in `store-assets/`, but none of them shows the overlay on top of a running game, which reviewers generally expect.
+- Overwolf Developer Console submission itself: uploading the listing text, icons, and screenshots, and answering the account whitelisting questions.
+
+Ready for submission:
+
+- `docs/store-listing.md` describes the current overlay. The privacy summary lists every field the summary actually carries, including the engagement timeline, and states that the timeline records when something happened and never where.
+- `store-assets/` holds four 1920x1080 screenshots: the session timeline with replay entry points, the map replay at a death moment, the desktop window with diagnostics expanded, and the in-game overlay.
+- Icons (`assets/bgms-icon.png`, `bgms-icon-gray.png`, `Tile.jpg`, `desktop-icon.ico`) and the dock button title are in the manifest.
+- Domain ownership is verifiable at `https://bgms.kr/overwolf-verification.txt`.
 
 Deliberately deferred (needs separate approval):
 
