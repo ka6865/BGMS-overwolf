@@ -9,15 +9,15 @@ Done and verified:
 - `POST https://bgms.kr/api/overwolf/session` is deployed. Smoke-tested against the production domain: 200 `stored:true`, 200 `duplicate:true` on resend, 422 for `damage_dealt`, 400 for an empty body, 204 + CORS for `OPTIONS`, 405 for `GET`. Test rows were deleted afterwards.
 - `overwolf_session_events` and `overwolf_session_quota` exist in the production database with RLS on and `anon` grants revoked.
 - `event_timeline` column and the read RPCs (`list_overwolf_sessions`, `get_overwolf_session`) are applied to the production database. All five Overwolf functions grant EXECUTE to `service_role` only; the old nine-argument insert signature was dropped.
-- The web session view renders against a local server backed by the production database: list, per-session stats, expandable engagement timeline, and the analysis link. No horizontal overflow at 1280 or 390 px.
+- The read route and the web session view are deployed. Smoke-tested against `https://bgms.kr`: a full timeline payload stores and re-sends as a duplicate, a `damage_dealt` entry inside the timeline returns 422, a `location` entry is silently dropped, the list returns the normalized view with a sorted timeline, and the response leaks no `source_host` or `is_internal`. A session with only `pseudo_match_id` renders without an analysis link. Test rows were deleted afterwards.
+- The page renders at 1280 and 390 px with no horizontal overflow.
 - 90-day retention is wired into the daily cleanup job in the BGMS repository.
 - 66 app tests, 43 server tests, 8 migration DB scenarios pass.
 
 Not done, required before a public listing:
 
-- Deploy the new read route. `https://bgms.kr/api/overwolf/sessions` and `/overwolf/sessions` return 404 until the BGMS repository ships. The app's "open my session history" button will fail until then.
 - Real-game confirmation that `me`, `roster`, and `knockedout` updates arrive during a live PUBG match. Only the simulator and mock harness paths are confirmed.
-- Real-game confirmation that `match_id` is emitted, and that its value resolves against the official PUBG API. Post-match analysis linking depends on it; a session with only `pseudo_match_id` is shown without an analysis link by design.
+- Real-game confirmation that `match_id`, `rank`, `map`, `headshots`, and `max_kill_distance` are emitted, and that `match_id` resolves against the official PUBG API. Post-match analysis linking depends on `match_id`; a session with only `pseudo_match_id` is shown without an analysis link by design.
 - `.opk` packaging on Windows and a re-check of unpacked-only limitations.
 - Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots. The listing copy and screenshots must be redone for the reworked overlay.
 

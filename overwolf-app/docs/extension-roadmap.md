@@ -212,6 +212,7 @@ HUD 에서 제거 완료 (배그 기본 HUD와 중복). 리듀서는 계속 수�
 - `app/api/overwolf/sessions/route.ts`(GET) + `list_overwolf_sessions` / `get_overwolf_session` RPC. 읽기도 `service_role` 전용이며 `source_host`/`is_internal` 은 반환하지 않는다
 - 데스크탑 창의 "내 세션 기록 열기" 버튼이 `overwolf.utils.openUrlInDefaultBrowser` 로 이 화면을 연다. 이 API 는 별도 permission 을 요구하지 않아 manifest 권한이 늘지 않았다
 - 공식 API 조회 가능 여부를 `gep_summary.official_match_id` 로 분리해 담고, 화면은 `canOpenAnalysis` 가 true 인 세션만 `/stats/{platform}/{nickname}` 분석 경로로 연결한다. `pseudo_match_id` 만 있는 세션은 "공식 매치 ID 미수신" 으로 표기하고 링크를 만들지 않는다
+- 2026-08-01 운영 배포 완료(BGMS PR #128). `https://bgms.kr/overwolf/sessions` 와 `https://bgms.kr/api/overwolf/sessions` 가 동작한다
 
 그다음:
 

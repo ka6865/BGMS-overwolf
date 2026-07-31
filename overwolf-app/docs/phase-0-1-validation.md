@@ -152,10 +152,25 @@ Migration `20260801080000_overwolf_gep_session_timeline.sql` was applied to prod
 - The web view renders the list, per-session stats, and the expanded timeline as `1:30 기절 / 7:00 처치 / 24:30 가해자 Ace_Tullis`, sorted by elapsed time. No horizontal overflow at 1280 or 390 px.
 - All verification rows and quota keys were deleted. Both tables are back to 0 rows.
 
+### Verified against production `https://bgms.kr` (2026-08-01)
+
+The read route and the web view are deployed (BGMS PR #128 merged to `main`). Checked against the public domain:
+
+- `POST /api/overwolf/session` with a full timeline payload returns 200 `stored:true`. A resend returns 200 `duplicate:true`.
+- A timeline entry carrying `damage_dealt` returns 422, so the blocked-field check reaches into array elements.
+- A `location` entry inside an otherwise valid timeline is silently dropped: the stored session keeps only `knockedout`, `kill`, and `killer`.
+- `GET /api/overwolf/sessions?player=ProdP3Smoke&platform=steam` returns the normalized view: `canOpenAnalysis` true, `durationSeconds` 1470, `rank_place` 7 of 96, `maxKillDistance` 212.75, and the timeline sorted as `1:30 knockedout`, `7:00 kill`, `24:30 killer`.
+- The response contains no `source_host`, no `is_internal`, and no `location` key.
+- A session with only `pseudo_match_id` returns `canOpenAnalysis: false` and renders as `공식 매치 ID 미수신` with no analysis link.
+- `GET` with a two-character nickname returns 400. An unknown `sessionId` returns 404.
+- The page renders at 1280 and 390 px with no horizontal overflow, one analysis link (only the session with an official match id), and the expanded timeline visible.
+
+All smoke rows and quota keys were deleted. Both tables are back to 0 rows.
+
 ### Not verified
 
-- `https://bgms.kr/api/overwolf/sessions` and `/overwolf/sessions` still return 404. The read route is not deployed yet, so the desktop window's session-history button will fail against production until the BGMS repository ships.
-- Whether a live PUBG match actually emits `match_id`, `rank`, `map`, `headshots`, and `max_kill_distance`. Everything above used synthetic payloads shaped after the official documentation tables.
+- Whether a live PUBG match actually emits `match_id`, `rank`, `map`, `headshots`, and `max_kill_distance`. Everything above used synthetic payloads shaped after the official documentation tables. This is the single remaining gap for the post-match analysis link, because a session with only `pseudo_match_id` cannot reach the official API.
+- Linking a session to that specific match's telemetry map view. The current link goes to the player's stats page.
 
 ## Observed vs Official (keep separated)
 

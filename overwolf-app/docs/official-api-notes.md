@@ -379,4 +379,17 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 로컬 서버 종단: `GET /api/overwolf/sessions`가 정규화된 뷰를 반환하고 `durationSeconds` 1470, `canOpenAnalysis` 계산 확인
 - 검증 데이터는 모두 삭제해 두 테이블 0행 복구
 
-운영 도메인 `https://bgms.kr/api/overwolf/sessions`는 아직 404다. 새 라우트가 배포되지 않았기 때문이며 배포 후 스모크가 필요하다.
+### 운영 배포 후 스모크 (2026-08-01, BGMS PR #128 머지)
+
+조회 라우트와 웹 화면이 배포됐고 운영 도메인에서 확인했다.
+
+- 타임라인 포함 payload `POST` 200 `stored:true`, 재전송 200 `duplicate:true`
+- 타임라인 항목 안의 `damage_dealt` → 422. 금지 필드 탐색이 배열 원소까지 들어간다
+- 타임라인 항목 중 `kind: "location"`은 조용히 버려진다. 저장된 세션에는 `knockedout`, `kill`, `killer`만 남는다
+- `GET /api/overwolf/sessions`가 정규화된 뷰 반환: `canOpenAnalysis` true, `durationSeconds` 1470, 순위 7/96, `maxKillDistance` 212.75, 타임라인 `1:30 knockedout` / `7:00 kill` / `24:30 killer` 정렬
+- 응답에 `source_host`, `is_internal`, `location` 키 없음
+- `pseudo_match_id`만 있는 세션은 `canOpenAnalysis: false`이고 화면에 "공식 매치 ID 미수신"으로 표시되며 분석 링크가 없다
+- 2자 닉네임 조회 400, 없는 `sessionId` 404
+- 1280px과 390px에서 가로 넘침 없음, 분석 링크는 공식 match id가 있는 세션 1건에만 노출
+
+스모크 행과 쿼터 키는 모두 삭제해 두 테이블 0행이다.
