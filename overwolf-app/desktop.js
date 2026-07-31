@@ -36,6 +36,7 @@
   function syncSettingsControls() {
     var settings = window.bgmsI18n.getOverlaySettings();
     var opacityInput = document.getElementById("overlay-opacity");
+    var opacityValue = document.getElementById("overlay-opacity-value");
 
     ["mode", "position"].forEach(function (setting) {
       querySettingButtons(setting).forEach(function (button) {
@@ -48,6 +49,15 @@
 
     if (opacityInput) {
       opacityInput.value = String(settings.opacity);
+    }
+
+    // range 는 값 자체가 보이지 않으므로 퍼센트를 함께 노출하고 스크린리더에도 전달한다.
+    if (opacityValue) {
+      opacityValue.textContent = Math.round(settings.opacity * 100) + "%";
+    }
+
+    if (opacityInput) {
+      opacityInput.setAttribute("aria-valuetext", Math.round(settings.opacity * 100) + "%");
     }
   }
 
@@ -307,6 +317,8 @@
     }
 
     if (!state) {
+      // 컨트롤러가 아직 없어도(미리보기/기동 직전) 전송 설정 상태는 보여줄 수 있다.
+      setText("handoff-status", describeHandoff({}));
       return;
     }
 

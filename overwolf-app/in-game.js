@@ -93,6 +93,28 @@
     }
   }
 
+  /*
+   * GEP phase 원본 값은 loading_screen 처럼 길어서 좁은 HUD 에서 잘린다.
+   * 표시용으로만 짧은 라벨로 바꾸고, 원본 값은 디버그 패널의 Last/Raw 에 그대로 남긴다.
+   * 공식 목록에 없는 값(관측된 starting 등)은 원본을 그대로 보여준다.
+   */
+  var PHASE_LABEL_KEYS = {
+    lobby: "phaseLobby",
+    loading_screen: "phaseLoadingScreen",
+    airfield: "phaseAirfield",
+    aircraft: "phaseAircraft",
+    freefly: "phaseFreefly",
+    landed: "phaseLanded",
+    starting: "phaseStarting"
+  };
+
+  function translatePhase(phase) {
+    var t = window.bgmsI18n.translate;
+    var key = phase ? PHASE_LABEL_KEYS[String(phase).toLowerCase()] : null;
+
+    return key ? t(key) : phase;
+  }
+
   function toggleHidden(element, hidden) {
     if (element) {
       element.classList.toggle("is-hidden", hidden);
@@ -108,12 +130,18 @@
         : state.detectedGameRunning
           ? t("waitingForMatch")
           : t("waitingForPubg");
-    var phaseLabel = state.phase || t("idle");
+    var phaseLabel = state.phase ? translatePhase(state.phase) : t("idle");
     var hasAlive = state.alivePlayers !== null && state.alivePlayers !== undefined;
     var hasHealth = state.health !== null && state.health !== undefined;
-    var isDegraded = state.serviceStatusState === 2 || state.serviceStatusState === 3 || state.gepStatus === "error" || state.gepStatus === "unavailable";
+    // 경고 판정은 리듀서와 background 창 높이 계산이 같은 기준을 쓰도록 gep-state 에 둔다.
+    var isDegraded = window.bgmsGepState
+      ? window.bgmsGepState.isServiceDegraded(state)
+      : state.serviceStatusState === 2 || state.serviceStatusState === 3
+        || state.gepStatus === "error" || state.gepStatus === "unavailable";
 
-    if (state.gepStatus === "connected" && !state.lastInfoReceivedAt && phaseLabel === "Idle") {
+    // 연결은 됐지만 아직 info 가 한 건도 안 온 상태를 구분한다.
+    // 번역 결과와 비교하면 한국어에서 깨지므로 리듀서의 원본 phase 값으로 판단한다.
+    if (state.gepStatus === "connected" && !state.lastInfoReceivedAt && state.phase === "Idle") {
       phaseLabel = t("sync");
     }
 

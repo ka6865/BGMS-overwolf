@@ -872,6 +872,24 @@
   }
 
   /*
+   * 오버레이 경고 라인을 띄울지 판정한다.
+   * 공식 status code 2(yellow)/3(red)이거나 GEP 자체가 오류/불가 상태일 때만 true다.
+   * 오버레이 창 높이 계산과 HUD 표시가 같은 기준을 쓰도록 리듀서에 둔다.
+   */
+  function isServiceDegraded(state) {
+    if (!state) {
+      return false;
+    }
+
+    var statusState = normalizeNumber(state.serviceStatusState);
+
+    return statusState === 2
+      || statusState === 3
+      || state.gepStatus === "error"
+      || state.gepStatus === "unavailable";
+  }
+
+  /*
    * 서버(app/api/overwolf/session)가 허용하는 필드만 담는다.
    * identity(player_id/platform)는 GEP 닉네임이 아니라 사용자가 앱에서 입력한 값을 받는다.
    */
@@ -926,6 +944,7 @@
     reduceGepError: reduceGepError,
     reduceServiceStatus: reduceServiceStatus,
     calculateAlivePlayers: calculateAlivePlayers,
+    isServiceDegraded: isServiceDegraded,
     buildSessionSummary: buildSessionSummary,
     safeParse: safeParse,
     summarizeValue: summarizeValue

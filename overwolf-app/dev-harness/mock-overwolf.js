@@ -6,6 +6,8 @@
   var errorListeners = [];
   var hotkeyListeners = [];
   var gameInfoListeners = [];
+  var windowSizeCalls = [];
+  var windowPositionCalls = [];
 
   // PUBG instance id. 공식 규칙상 manifest용 class id는 floor(109061 / 10) = 10906 이다.
   var PUBG_INSTANCE_ID = 109061;
@@ -63,9 +65,16 @@
         if (callback) callback();
       },
       changeSize: function (options, callback) {
+        // 오버레이 창 높이 조절을 테스트에서 확인할 수 있게 호출 이력을 남긴다.
+        windowSizeCalls.push({
+          windowId: options && options.window_id,
+          width: options && options.width,
+          height: options && options.height
+        });
         if (callback) callback();
       },
       changePosition: function (id, x, y, callback) {
+        windowPositionCalls.push({ windowId: id, left: x, top: y });
         if (callback) callback();
       },
       dragMove: function (id, callback) {
@@ -79,7 +88,7 @@
     extensions: {
       current: {
         getManifest: function (callback) {
-          callback({ meta: { version: "0.3.0" } });
+          callback({ meta: { version: "0.4.0" } });
         }
       }
     },
@@ -269,6 +278,17 @@
     },
     sessionRequests: function () {
       return sessionRequests.slice();
+    },
+    // 오버레이 창 크기/위치 조절 이력. 경고 라인 표시 시 높이가 늘어나는지 확인한다.
+    windowSizeCalls: function () {
+      return windowSizeCalls.slice();
+    },
+    windowPositionCalls: function () {
+      return windowPositionCalls.slice();
+    },
+    resetWindowCalls: function () {
+      windowSizeCalls.length = 0;
+      windowPositionCalls.length = 0;
     }
   };
 })();

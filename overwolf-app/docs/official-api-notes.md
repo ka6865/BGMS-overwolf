@@ -280,3 +280,34 @@ desktop 진단을 기준으로 판단한다.
 - 스모크로 만든 행과 쿼터 키는 모두 삭제했고 두 테이블은 다시 0행이다.
 
 따라서 클라이언트 큐가 배포 대기 때문에 쌓이는 상황은 더 이상 없다. 아직 남은 것은 적재된 요약을 BGMS 웹에서 읽는 경로이며, 이는 Phase 2 항목으로 승인 전 구현하지 않는다.
+
+## 오버레이 창 크기 조절 (2026-08-01 확인)
+
+`overwolf.windows.changeSize`로 표시 상태에 따라 인게임 창 높이를 바꾼다. manifest의 `in_game.size`는 초기값일 뿐이고 런타임에서 조정한다.
+
+- mini 기본 78px, 경고 라인 노출 시 100px, debug 236px. 폭은 항상 348px로 manifest와 일치시킨다.
+- `in_game` 창은 `resizable: false` + `.overlay-shell { overflow: hidden }`이므로 콘텐츠가 창보다 크면 사용자가 볼 방법이 없다. 표시 항목을 늘릴 때 높이를 함께 조정해야 한다.
+- 경고 표시 판정은 `gepState.isServiceDegraded(state)` 한 곳에서만 한다. 공식 status code 2(yellow)/3(red) 또는 `gepStatus`가 `error`/`unavailable`일 때 true다. code 0(unsupported)과 1(green)은 경고가 아니다.
+- `setState`에서 경고 상태가 전환될 때만 `changeSize`를 호출한다. 같은 상태가 반복 수신되면 창 크기를 다시 건드리지 않는다.
+
+### CSS 선택자 제약
+
+manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트의 CEF에서 동작이 보장되지 않는 최신 선택자는 쓰지 않는다. 진단 패널에서 `:has()`를 쓰려다 명시적 클래스(`.diagnostic-span`)로 바꿨다.
+
+## 데스크탑 창을 서브모니터로 옮기기 (2026-08-01)
+
+이전 manifest에서 `desktop` 창에 `desktop_only`가 없었다. 공식 Manifest 문서 기준으로 `in_game_only`와 `desktop_only`가 모두 없으면 그 창은 두 컨텍스트에 걸쳐 쓰이고, 게임 실행 중에는 오버레이 컨텍스트로 주입되어 게임 화면에 묶인다. 그래서 보조 모니터로 빼기 어려웠다.
+
+공식 Second Screen 가이드가 요구하는 플래그를 `desktop` 창에 적용했다.
+
+| 플래그 | 값 | 근거 |
+| --- | --- | --- |
+| `desktop_only` | `true` | Second Screen 가이드 2번 항목. `native_window: true`의 전제 조건이기도 하다 |
+| `native_window` | `true` | Second Screen 가이드 3번 항목. 창을 OS 네이티브 창으로 만들어 모니터 간 이동을 자유롭게 한다 |
+| `use_os_windowing` | `true` | OS 최대화(전체화면)와 작업표시줄 최소화를 켠다. `desktop_only: true`일 때만 유효하다 (0.102+) |
+| `disable_hardware_acceleration` | `true` | Second Screen 가이드 4번 항목. 게임과 같이 돌 때 GPU 사용을 줄여 게임 성능을 보호한다 (0.159+) |
+| `keep_window_location` | `true` | Second Screen 가이드 1번 항목. 사용자가 옮긴 모니터/위치를 기억한다 |
+
+자동으로 "게임이 없는 모니터"에 창을 배치하는 것은 `getMonitorsList`가 필요하고 이는 별도 권한을 요구한다. 심사 시 권한 설명 부담이 늘어나므로 지금은 구현하지 않았다. 대신 `native_window` + `keep_window_location` 조합으로 사용자가 직접 옮긴 위치가 유지되게 했다.
+
+검증 상태: manifest 플래그 적용과 여러 해상도에서의 레이아웃(760x520 ~ 2560x1440, 세로 모니터)은 확인했다. 실제 Overwolf 클라이언트에서 창이 보조 모니터로 분리되는지는 Windows 실환경 확인이 필요하다.

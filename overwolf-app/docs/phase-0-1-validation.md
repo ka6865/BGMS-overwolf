@@ -67,6 +67,8 @@ To point the harness at a local BGMS server instead of the interceptor, set `win
 - Confirm the overlay shows a warning line when the event service status is yellow/red or when `onError` fires.
 - Confirm HP shows `KO` only when `health` is 0 while `ko_health` remains above 0.
 - Confirm `SESSION_ENDPOINT` in `background.js` points at the deployed BGMS endpoint (`https://bgms.kr/api/overwolf/session`) and that the endpoint responds before enabling handoff for users.
+- Confirm the desktop window can be dragged to a second monitor while PUBG is running, that it stays there across restarts (`keep_window_location`), and that OS maximize and taskbar minimize work (`use_os_windowing`).
+- Confirm the desktop window no longer appears inside the in-game overlay context now that `desktop_only: true` is set.
 
 ## Server Endpoint Checks (BGMS repository)
 
@@ -103,6 +105,29 @@ The route is deployed. Checked directly against the public domain, not a local s
 All rows and quota keys created by this smoke test were deleted afterwards. Both tables are back to 0 rows.
 
 Remaining gap: nothing on the BGMS website reads `overwolf_session_events` yet, and the Overwolf app has no link back into a BGMS session view. Consuming the stored summaries in the web UI is a Phase 2 item and needs separate approval.
+
+## UI and Performance Audit (2026-08-01)
+
+Measured with headless Chrome at the real manifest window sizes, plus CoreText text metrics for width budgets. No game or Overwolf client involved.
+
+Fixed in this pass:
+
+- In-game HUD width. At 348px the `KO` flag plus a three-digit alive count pushed the alive counter past the window edge (335px content vs 318px usable). `.overlay-card` now matches the manifest width, the brand label is shortened to `BGMS` with the full name as a tooltip, and `.mini-item` allows the label to shrink while the number stays intact. Worst measured case is now 295px against 334px usable.
+- Status line wrapping. Four simultaneous items (match state, long kill notice, pending count, service warning) needed 512px on one line and were silently ellipsized. `.mini-status` now wraps, and the warning takes its own row.
+- Overlay height with a warning. `background.js` raises the mini window from 78px to 100px while a warning row is visible, and returns to 78px when it clears. Measured worst case is 96px.
+- Desktop window density. Content was 1748px tall in a 700px window, so the diagnostics panel and both policy cards were entirely below the fold. The diagnostics list is now an auto-fit grid (4 columns at 980px, 3 at 760px), the hero uses panel-scale type instead of 44px display type, the language switcher moved into the title bar, and fixed panel min-heights were removed. Content is now 1102px, and the handoff and overlay settings panels are fully visible in the first screen.
+- Phase labels. Raw GEP values such as `loading_screen` were truncated at 72px. The HUD now shows short localized labels; the raw value stays in the debug panel.
+- Duplicated degraded-service logic in `in-game.js` and `background.js` was replaced with `gepState.isServiceDegraded`, so the warning row and the window height use one rule.
+- Accessibility: the close button has a localized tooltip, the opacity slider exposes its percentage as visible text and `aria-valuetext`, platform buttons carry an initial `aria-pressed`, and the handoff status no longer looks like a text input.
+
+Measured after the fixes:
+
+- Overlay card: 58px in mini, 73px with a warning (78px window), 187px in debug (236px window). No horizontal overflow at any state.
+- Diagnostics: 4 columns / 5 rows at 980px, 3 columns / 6 rows at 760px, zero truncated values.
+- Reducer cost: 6.6us per info update; with the two state clones in `patchState` and `notifySubscribers`, 18.8us per update. At 30 updates per second that is 0.06% of one core and 78KB/s of allocation.
+- State does not grow: after 5000 cycles `recentUpdates` stays at 6 entries and the snapshot stays at ~1.3KB. `damage`-prefixed strings appear only in the `ignoredUpdates` diagnostic label, never in the outgoing summary (565 bytes against the 16KB server limit).
+
+Not verified: real PUBG rendering. All of the above is headless Chrome plus computed CSS, not the Overwolf client compositor.
 
 ## Observed vs Official (keep separated)
 

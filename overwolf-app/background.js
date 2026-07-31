@@ -37,6 +37,9 @@
 
   var OVERLAY_WIDTH = 348;
   var OVERLAY_MINI_HEIGHT = 78;
+  // 경고 줄이 자기 행을 차지하면 mini 모드가 한 줄 더 필요하다.
+  // .mini-status 는 flex-wrap 이고 한 줄이 10px * 1.25 + row-gap 10px 를 쓴다.
+  var OVERLAY_MINI_WARNING_HEIGHT = 100;
   var OVERLAY_DEBUG_HEIGHT = 236;
 
   var overlayVisible = false;
@@ -100,8 +103,15 @@
   }
 
   function setState(nextState) {
+    var wasDegraded = gepState.isServiceDegraded(state);
+
     state = nextState;
     notifySubscribers();
+
+    // 경고 라인이 새로 뜨거나 사라지면 mini 오버레이 높이를 맞춘다.
+    if (overlayVisible && gepState.isServiceDegraded(state) !== wasDegraded) {
+      applyOverlaySettings();
+    }
   }
 
   function patchState(partial) {
@@ -267,6 +277,19 @@
     };
   }
 
+  /*
+   * 오버레이 창 높이를 현재 표시 상태에 맞춘다.
+   * 경고 라인은 .mini-status 안에서 자기 행을 차지하므로 mini 모드에서 한 줄이 더 필요하다.
+   * 높이가 부족하면 overflow:hidden + resizable:false 조합 때문에 아래쪽이 보이지 않는다.
+   */
+  function resolveOverlayHeight(settings) {
+    if (settings.mode === "debug") {
+      return OVERLAY_DEBUG_HEIGHT;
+    }
+
+    return gepState.isServiceDegraded(state) ? OVERLAY_MINI_WARNING_HEIGHT : OVERLAY_MINI_HEIGHT;
+  }
+
   function applyOverlaySettings(settings) {
     var nextSettings = settings || getOverlaySettings();
 
@@ -276,7 +299,7 @@
 
     overwolf.windows.getWindow(IN_GAME_WINDOW, function (result) {
       var position = getOverlayPosition(nextSettings.position);
-      var nextHeight = nextSettings.mode === "debug" ? OVERLAY_DEBUG_HEIGHT : OVERLAY_MINI_HEIGHT;
+      var nextHeight = resolveOverlayHeight(nextSettings);
 
       if (!result || result.status !== "success") {
         return;

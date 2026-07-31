@@ -68,12 +68,20 @@
       languageEnglish: "English",
       languageKorean: "Korean",
       overlayEyebrow: "BGMS Companion",
+      overlayBrandShort: "BGMS",
       waitingForPubg: "Waiting for PUBG",
       waitingForMatch: "Waiting for match",
       liveMatch: "Live match",
       matchEnded: "Match ended",
       idle: "Idle",
       sync: "Sync",
+      phaseLobby: "Lobby",
+      phaseLoadingScreen: "Loading",
+      phaseAirfield: "Airfield",
+      phaseAircraft: "Plane",
+      phaseFreefly: "Freefly",
+      phaseLanded: "Landed",
+      phaseStarting: "Starting",
       pending: "Pending",
       kills: "Kills",
       alive: "Alive",
@@ -153,12 +161,20 @@
       languageEnglish: "영어",
       languageKorean: "한국어",
       overlayEyebrow: "BGMS Companion",
+      overlayBrandShort: "BGMS",
       waitingForPubg: "PUBG 대기 중",
       waitingForMatch: "매치 대기 중",
       liveMatch: "매치 진행 중",
       matchEnded: "매치 종료",
       idle: "대기",
       sync: "동기화",
+      phaseLobby: "로비",
+      phaseLoadingScreen: "로딩",
+      phaseAirfield: "대기섬",
+      phaseAircraft: "비행기",
+      phaseFreefly: "낙하",
+      phaseLanded: "착지",
+      phaseStarting: "시작",
       pending: "대기",
       kills: "킬",
       alive: "생존",
@@ -236,6 +252,11 @@
 
     Array.prototype.forEach.call(scope.querySelectorAll("[data-i18n-aria-label]"), function (element) {
       element.setAttribute("aria-label", translate(element.getAttribute("data-i18n-aria-label"), language));
+    });
+
+    // 아이콘 버튼의 hover 툴팁도 언어에 맞춘다.
+    Array.prototype.forEach.call(scope.querySelectorAll("[data-i18n-title]"), function (element) {
+      element.setAttribute("title", translate(element.getAttribute("data-i18n-title"), language));
     });
   }
 

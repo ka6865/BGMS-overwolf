@@ -338,3 +338,44 @@ test("리스너는 재구독해도 중복 등록되지 않는다", () => {
   assert.equal(counts.events, 1);
   assert.equal(counts.errors, 1);
 });
+
+test("오버레이 창 높이는 mini/debug 모드에 맞춰 조정된다", () => {
+  const sandbox = createSandbox();
+
+  sandbox.mockGep.resetWindowCalls();
+  sandbox.bgmsController.applyOverlaySettings({ mode: "mini", opacity: 1, position: "top-left" });
+  sandbox.bgmsController.applyOverlaySettings({ mode: "debug", opacity: 1, position: "top-left" });
+
+  const heights = sandbox.mockGep.windowSizeCalls().map((call) => call.height);
+
+  // debug 모드는 진단 7줄이 들어가므로 mini 보다 커야 한다.
+  assert.equal(heights[0], 78);
+  assert.equal(heights[1], 236);
+  assert.ok(heights[1] > heights[0]);
+
+  // 폭은 manifest in_game width 와 항상 같아야 한다.
+  sandbox.mockGep.windowSizeCalls().forEach((call) => {
+    assert.equal(call.width, 348);
+  });
+});
+
+test("서비스 경고가 뜨면 mini 오버레이 높이가 경고 줄만큼 늘어난다", () => {
+  const sandbox = createSandbox();
+
+  sandbox.mockGep.resetWindowCalls();
+
+  // onError 는 gepStatus 를 error 로 만들어 경고 라인을 띄운다.
+  sandbox.mockGep.fireError({ reason: "provider disconnected" });
+
+  const degradedHeights = sandbox.mockGep.windowSizeCalls().map((call) => call.height);
+
+  assert.ok(degradedHeights.length > 0, "경고 전환 시 창 크기를 다시 맞춰야 한다");
+  assert.equal(degradedHeights[degradedHeights.length - 1], 100);
+  assert.equal(sandbox.bgmsGepState.isServiceDegraded(sandbox.bgmsController.getState()), true);
+
+  // 경고 상태가 유지되는 동안 같은 이벤트가 또 와도 창 크기를 반복 변경하지 않는다.
+  sandbox.mockGep.resetWindowCalls();
+  sandbox.mockGep.fireError({ reason: "provider disconnected" });
+
+  assert.equal(sandbox.mockGep.windowSizeCalls().length, 0);
+});

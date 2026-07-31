@@ -354,3 +354,23 @@ test("REQUIRED_FEATURES는 Phase 1 허용 목록과 동일하다", () => {
     "me"
   ]);
 });
+
+test("isServiceDegraded: 경고 라인 표시 기준을 한 곳에서 판정한다", () => {
+  const state = baseState();
+
+  assert.equal(gep.isServiceDegraded(state), false);
+  assert.equal(gep.isServiceDegraded(null), false);
+
+  // 공식 status code 0(unsupported)과 1(green)은 경고가 아니다.
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { serviceStatusState: 0 })), false);
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { serviceStatusState: 1 })), false);
+
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { serviceStatusState: 2 })), true);
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { serviceStatusState: 3 })), true);
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { gepStatus: "error" })), true);
+  assert.equal(gep.isServiceDegraded(Object.assign({}, state, { gepStatus: "unavailable" })), true);
+
+  // reduceServiceStatus / reduceGepError 를 거친 실제 상태에서도 같은 판정이 나와야 한다.
+  assert.equal(gep.isServiceDegraded(gep.reduceServiceStatus(state, { game_id: 10906, state: 2 })), true);
+  assert.equal(gep.isServiceDegraded(gep.reduceGepError(state, { reason: "provider disconnected" })), true);
+});
