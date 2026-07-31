@@ -1,6 +1,26 @@
-# BGMS Companion Overwolf MVP
+# BGMS Companion Overwolf App
 
-This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submission preparation.
+This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submission preparation. The client, the BGMS receiving endpoint, and the database table are all live; the remaining launch work is Overwolf-side submission, not code.
+
+## Release Readiness (2026-07-31)
+
+Done and verified:
+
+- `POST https://bgms.kr/api/overwolf/session` is deployed. Smoke-tested against the production domain: 200 `stored:true`, 200 `duplicate:true` on resend, 422 for `damage_dealt`, 400 for an empty body, 204 + CORS for `OPTIONS`, 405 for `GET`. Test rows were deleted afterwards.
+- `overwolf_session_events` and `overwolf_session_quota` exist in the production database with RLS on and `anon` grants revoked.
+- 90-day retention is wired into the daily cleanup job in the BGMS repository.
+- 52 app tests, 18 server route tests, 8 migration DB scenarios pass.
+
+Not done, required before a public listing:
+
+- Real-game confirmation that `me`, `roster`, and `knockedout` updates arrive during a live PUBG match. Only the simulator and mock harness paths are confirmed.
+- `.opk` packaging on Windows and a re-check of unpacked-only limitations.
+- Overwolf Developer Console submission: store listing text (see `docs/store-listing.md`), icons, screenshots.
+
+Deliberately deferred to Phase 2 (needs separate approval):
+
+- Reading the stored summaries anywhere on `bgms.kr`. Nothing on the website consumes `overwolf_session_events` yet, and the app has no deep link into a BGMS session view. Handoff currently writes to the table and stops there.
+- Automatically triggering the BGMS analysis pipeline from a stored summary.
 
 ## Scope
 

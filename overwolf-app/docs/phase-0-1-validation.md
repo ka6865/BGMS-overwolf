@@ -87,6 +87,23 @@ To point the harness at a local BGMS server instead of the interceptor, set `win
 
 Note: Supabase's `service_role` has `BYPASSRLS`, so RLS alone does not gate it. Protection for this table comes from RLS plus revoking `anon`/`authenticated` table grants and function `EXECUTE`. A throwaway test role must be created with `bypassrls` to reflect production behaviour.
 
+### Verified against production `https://bgms.kr` (2026-07-31)
+
+The route is deployed. Checked directly against the public domain, not a local server:
+
+- `OPTIONS /api/overwolf/session` returns 204 with CORS headers.
+- `GET /api/overwolf/session` returns 405 (no GET handler), so the route is not readable.
+- `POST` with a full summary returns 200 `{"stored":true,"duplicate":false}` and the row lands in `overwolf_session_events` with `source_host: bgms.kr`, `is_internal: false`.
+- The same `session_id` posted again returns 200 `{"stored":false,"duplicate":true}` and does not overwrite the stored summary.
+- `POST` with `gep_summary.damage_dealt` returns 422.
+- `POST {}` returns 400.
+- `unknown_key` at the top level is dropped; `player_id` is stored lowercase.
+- `https://bgms.kr/overwolf-verification.txt` returns 200.
+
+All rows and quota keys created by this smoke test were deleted afterwards. Both tables are back to 0 rows.
+
+Remaining gap: nothing on the BGMS website reads `overwolf_session_events` yet, and the Overwolf app has no link back into a BGMS session view. Consuming the stored summaries in the web UI is a Phase 2 item and needs separate approval.
+
 ## Observed vs Official (keep separated)
 
 - Official phase list has no `starting`, but `starting` was observed in real gameplay (2026-07-08).

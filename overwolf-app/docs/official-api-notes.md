@@ -268,3 +268,15 @@ desktop 진단을 기준으로 판단한다.
 - 하네스를 로컬 서버에 붙인 종단 테스트에서 실제 HTTP 전송, 단일 행 적재, 큐 비움까지 확인했다.
 - 네트워크 단절 후 앱 재시작 시나리오에서 큐가 보존되고 복구 후 DB에 도달했다.
 - **주의**: Supabase `service_role`은 `BYPASSRLS` 속성을 가진다. RLS만으로는 이 롤을 막을 수 없고, 실제 방어선은 `anon`/`authenticated`의 테이블 권한과 함수 `EXECUTE` 회수다. 일회용 검증 DB에서 롤을 만들 때 `bypassrls`를 빼면 운영과 다르게 동작해 오탐이 난다.
+
+### 2026-07-31 운영 도메인 스모크 결과
+
+`https://bgms.kr/api/overwolf/session`은 배포되어 응답한다. 로컬 서버가 아니라 운영 도메인에 직접 요청해 확인한 값이다.
+
+- `OPTIONS` 204 + CORS 헤더, `GET` 405(핸들러 없음)
+- 정식 payload `POST` 200 `stored:true`, 같은 `session_id` 재전송 200 `duplicate:true`
+- `damage_dealt` 포함 payload 422, 빈 body 400
+- 적재된 행의 `source_host`는 `bgms.kr`, `is_internal`은 `false`
+- 스모크로 만든 행과 쿼터 키는 모두 삭제했고 두 테이블은 다시 0행이다.
+
+따라서 클라이언트 큐가 배포 대기 때문에 쌓이는 상황은 더 이상 없다. 아직 남은 것은 적재된 요약을 BGMS 웹에서 읽는 경로이며, 이는 Phase 2 항목으로 승인 전 구현하지 않는다.
