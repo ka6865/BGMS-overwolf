@@ -257,3 +257,14 @@ desktop 진단을 기준으로 판단한다.
 - 큐는 localStorage(`bgms_companion_session_queue`)에 보존되므로 앱 재시작 후에도 이어서 전송된다.
 - `player_id`는 GEP 닉네임이 아니라 사용자가 직접 입력한 값이다. GEP 닉네임을 identity로 신뢰하지 않는다는 원칙을 유지한다.
 - Overwolf 앱 창의 origin은 `overwolf-extension://`이므로 서버 라우트에 CORS(`OPTIONS` + `Access-Control-Allow-*`)를 명시했다.
+- 로컬 검증용으로 `window.bgmsDevEndpoint`가 있으면 그 값을 사용한다. Overwolf 런타임에는 이 값이 없으므로 패키지된 앱은 항상 운영 엔드포인트로 전송한다.
+
+### 2026-07-31 실 DB 검증 결과
+
+- 마이그레이션 적용 완료. `overwolf_session_events`, `overwolf_session_quota` 모두 실제 DB에 존재한다.
+- 중복 `session_id` 적재는 `false`를 반환하고 기존 `gep_summary`를 덮어쓰지 않는다. 서버 라우트는 이를 `duplicate: true` 200으로 응답한다.
+- `anon` 키로는 테이블 조회와 RPC 실행이 모두 `42501`로 차단된다.
+- 저장 시 허용 키 밖의 값(`unknown_key`, `secret`)은 버려지고 `player_id`는 소문자로 정규화된다.
+- 하네스를 로컬 서버에 붙인 종단 테스트에서 실제 HTTP 전송, 단일 행 적재, 큐 비움까지 확인했다.
+- 네트워크 단절 후 앱 재시작 시나리오에서 큐가 보존되고 복구 후 DB에 도달했다.
+- **주의**: Supabase `service_role`은 `BYPASSRLS` 속성을 가진다. RLS만으로는 이 롤을 막을 수 없고, 실제 방어선은 `anon`/`authenticated`의 테이블 권한과 함수 `EXECUTE` 회수다. 일회용 검증 DB에서 롤을 만들 때 `bypassrls`를 빼면 운영과 다르게 동작해 오탐이 난다.

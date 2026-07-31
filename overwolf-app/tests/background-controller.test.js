@@ -24,9 +24,15 @@ function createSandbox(options) {
   const storage = {};
   const settings = options && options.settings;
   const sessionStatus = options && options.sessionStatus;
+  const networkDown = options && options.networkDown;
+  const initialQueue = options && options.queue;
 
   if (settings) {
     storage.bgms_companion_service_settings = JSON.stringify(settings);
+  }
+
+  if (initialQueue) {
+    storage.bgms_companion_session_queue = JSON.stringify(initialQueue);
   }
 
   const sandbox = {
@@ -77,11 +83,17 @@ function createSandbox(options) {
     sandbox.mockGep.setSessionResponseStatus(sessionStatus);
   }
 
+  if (networkDown) {
+    sandbox.mockGep.setSessionNetworkDown(true);
+  }
+
   loadScript(sandbox, "background.js");
 
   sandbox.readStoredQueue = function () {
     return JSON.parse(storage.bgms_companion_session_queue || "[]");
   };
+
+  sandbox.storage = storage;
 
   return sandbox;
 }
@@ -231,6 +243,62 @@ test("서버가 4xx로 거부하면 재시도하지 않고 큐를 비운다", as
 
   assert.deepEqual(sandbox.readStoredQueue(), []);
   assert.equal(sandbox.bgmsController.getState().handoffOutcome, "rejected");
+});
+
+test("네트워크 단절 시 요약은 큐에 보존된다", async () => {
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "MyNick", platform: "steam" },
+    networkDown: true
+  });
+
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("kill", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const queue = sandbox.readStoredQueue();
+  const state = sandbox.bgmsController.getState();
+
+  assert.equal(queue.length, 1);
+  assert.equal(queue[0].payload.gep_summary.kills, 1);
+  assert.equal(state.handoffPending, 1);
+  assert.equal(state.handoffLastError, "network_error");
+  assert.equal(sandbox.mockGep.sessionRequests().length, 0);
+});
+
+// 앱을 다시 켜면 이전 실행에서 남은 큐를 이어서 전송해야 한다.
+test("재시작 후 보존된 큐를 이어서 전송한다", async () => {
+  const failed = createSandbox({
+    settings: { handoffEnabled: true, playerName: "MyNick", platform: "steam" },
+    networkDown: true
+  });
+
+  failed.mockGep.fireEvent("matchStart", "");
+  failed.mockGep.fireEvent("matchEnd", "");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const carriedQueue = failed.readStoredQueue();
+
+  assert.equal(carriedQueue.length, 1);
+
+  // 백오프 대기를 지난 상태로 만들어 재시작 직후 전송 대상이 되게 한다.
+  carriedQueue[0].nextAttemptAt = 0;
+
+  const restarted = createSandbox({
+    settings: { handoffEnabled: true, playerName: "MyNick", platform: "steam" },
+    queue: carriedQueue,
+    sessionStatus: 200
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const requests = restarted.mockGep.sessionRequests().map((body) => JSON.parse(body));
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].session_id, carriedQueue[0].payload.session_id);
+  assert.deepEqual(restarted.readStoredQueue(), []);
+  assert.equal(restarted.bgmsController.getState().handoffOutcome, "sent");
 });
 
 test("GEP onError는 오류 상태와 사유를 노출한다", () => {

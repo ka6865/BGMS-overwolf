@@ -128,6 +128,7 @@
   // 하네스에서 실제 운영 서버로 요청이 나가지 않게 하는 것이 목적이다.
   var originalFetch = window.fetch ? window.fetch.bind(window) : null;
   var sessionResponseStatus = 200;
+  var sessionNetworkDown = false;
   var sessionRequests = [];
 
   window.fetch = function (url, options) {
@@ -142,6 +143,12 @@
     }
 
     if (typeof url === "string" && url.indexOf("/api/overwolf/session") !== -1) {
+      if (sessionNetworkDown) {
+        console.log("Harness: session handoff rejected (network down)");
+
+        return Promise.reject(new Error("network down"));
+      }
+
       sessionRequests.push(options && options.body ? String(options.body) : "");
       console.log("Harness: session handoff intercepted, responding " + String(sessionResponseStatus));
 
@@ -256,6 +263,9 @@
     },
     setSessionResponseStatus: function (status) {
       sessionResponseStatus = Number(status) || 200;
+    },
+    setSessionNetworkDown: function (isDown) {
+      sessionNetworkDown = Boolean(isDown);
     },
     sessionRequests: function () {
       return sessionRequests.slice();

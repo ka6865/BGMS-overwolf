@@ -125,6 +125,9 @@
       <button class="btn" onclick="mockScenarios.setHandoffResponse(503)" style="border-color: rgba(246, 198, 103, 0.4); background: rgba(246, 198, 103, 0.1);">14. Endpoint responds 503 (retry)</button>
       <button class="btn" onclick="mockScenarios.setHandoffResponse(422)" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">15. Endpoint responds 422 (reject)</button>
       <button class="btn" onclick="mockScenarios.retryHandoff()">16. Retry pending handoff</button>
+      <button class="btn" onclick="mockScenarios.simulateNetworkDown()" style="border-color: rgba(239, 100, 97, 0.4); background: rgba(239, 100, 97, 0.1);">17. Network down (queue must hold)</button>
+      <button class="btn" onclick="mockScenarios.restoreNetwork()">18. Network restored</button>
+      <button class="btn" onclick="mockScenarios.flushHandoffNow()">19. Skip backoff and flush queue</button>
 
       <h3>Interactive Controls</h3>
       <div class="slider-group">

@@ -162,6 +162,43 @@
       if (window.bgmsController && typeof window.bgmsController.retryHandoff === "function") {
         window.bgmsController.retryHandoff();
       }
+    },
+
+    /*
+     * 17. 네트워크 단절 시나리오
+     *
+     * 전송 자체를 실패시켜 큐에 남는지 확인한다. 큐는 localStorage에 보존되므로
+     * 페이지를 새로 고쳐도 대기 항목이 유지되어야 한다.
+     */
+    simulateNetworkDown: function () {
+      console.log("Scenario: session endpoint unreachable.");
+      window.mockGep.setSessionNetworkDown(true);
+    },
+
+    restoreNetwork: function () {
+      console.log("Scenario: session endpoint reachable again.");
+      window.mockGep.setSessionNetworkDown(false);
+    },
+
+    // 18. 백오프 대기를 건너뛰고 즉시 재시도한다. 대기 시간 확인용이 아니라 복구 확인용이다.
+    flushHandoffNow: function () {
+      var raw;
+
+      try {
+        raw = JSON.parse(window.localStorage.getItem("bgms_companion_session_queue") || "[]");
+      } catch (_error) {
+        raw = [];
+      }
+
+      raw.forEach(function (entry) {
+        entry.nextAttemptAt = 0;
+      });
+      window.localStorage.setItem("bgms_companion_session_queue", JSON.stringify(raw));
+      console.log("Scenario: backoff cleared, retrying " + raw.length + " queued summaries.");
+
+      if (window.bgmsController && typeof window.bgmsController.retryHandoff === "function") {
+        window.bgmsController.retryHandoff();
+      }
     }
   };
 })();

@@ -13,8 +13,8 @@ npm test   # node --test overwolf-app/tests/*.test.js
 - `gep-state.test.js` covers PUBG official payload shapes: phase, match, match_info, kill, roster, me (health/weaponState), killer, knockedout, gep_internal, blocked payloads, matchEnd idempotency, session summary shape.
 - `session-queue.test.js` covers enqueue de-duplication, corrupted queue recovery, backoff scheduling, permanent 4xx rejection, retry on 429/5xx/network error, and max-attempt drop.
 - `settings.test.js` covers handoff consent defaults, nickname sanitization, platform validation, corrupted storage recovery, and the send precondition.
-- `background-controller.test.js` loads `dev-harness/mock-overwolf.js` in a vm context and covers PUBG detection via class id, `setRequiredFeatures` success path, `getInfo` snapshot, duplicate `matchEnd`, `onError`, game switch reset, duplicate listener prevention, and the full handoff path (off, missing nickname, single send, blocked-field absence, 503 retry, 422 rejection).
-- Server-side checks live in the BGMS repository: `npm run verify:overwolf` covers payload normalization, quota, idempotency, and migration security invariants.
+- `background-controller.test.js` loads `dev-harness/mock-overwolf.js` in a vm context and covers PUBG detection via class id, `setRequiredFeatures` success path, `getInfo` snapshot, duplicate `matchEnd`, `onError`, game switch reset, duplicate listener prevention, and the full handoff path (off, missing nickname, single send, blocked-field absence, 503 retry, 422 rejection, network-down queue retention, restart resume).
+- Server-side checks live in the BGMS repository: `npm run verify:overwolf` covers payload normalization, quota, idempotency, and migration security invariants. `npm run verify:overwolf-db` applies the migration to a throwaway PostgreSQL instance and runs RPC scenarios.
 - Add a failing test first whenever a real-game payload does not parse as expected.
 
 Manual UI harness (browser, no Overwolf client):
@@ -23,7 +23,9 @@ Manual UI harness (browser, no Overwolf client):
 open overwolf-app/dev-harness/mock.html
 ```
 
-Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, ignored `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, the GEP-data-missing failure case, and session handoff with 200/503/422 responses. The harness intercepts `/api/overwolf/session`, so no request reaches production.
+Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, ignored `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, the GEP-data-missing failure case, session handoff with 200/503/422 responses, network-down queue retention, and a backoff-skipping flush. The harness intercepts `/api/overwolf/session`, so no request reaches production.
+
+To point the harness at a local BGMS server instead of the interceptor, set `window.bgmsDevEndpoint` before the harness scripts load. Overwolf runtime never defines it, so the packaged app always uses the production endpoint.
 
 ## Phase 0 Manual Checks
 
@@ -68,12 +70,22 @@ Scenarios cover match start, kill, knock/revive, roster elimination, death + kil
 
 ## Server Endpoint Checks (BGMS repository)
 
-- Apply `supabase/migrations/20260731070000_overwolf_gep_session_events.sql` before enabling handoff in production.
-- Confirm `overwolf_session_events` and `overwolf_session_quota` exist with RLS enabled and no anon/authenticated grants.
-- Confirm a duplicate POST with the same `session_id` returns `duplicate: true` and does not create a second row.
-- Confirm a payload containing `damage_dealt`, `location`, or `team_location` is rejected with 422.
-- Confirm repeated posts for one `session_id` hit the 429 quota after 12 requests in 10 minutes.
+- Apply `supabase/migrations/20260731070000_overwolf_gep_session_events.sql` before enabling handoff in production. Applied 2026-07-31.
+- `npm run verify:overwolf-db` reproduces the schema and RPC behaviour on a throwaway instance (8 scenarios).
 - Confirm the daily cleanup job (`scripts/cleanup_pubg_cache.ts`) removes session rows older than 90 days.
+
+### Verified against the live database (2026-07-31)
+
+- `overwolf_session_events` and `overwolf_session_quota` exist with RLS enabled.
+- `record_overwolf_session_event` returns `true` on first insert and `false` on a duplicate `session_id`. The duplicate does not overwrite the stored summary.
+- `consume_overwolf_session_quota` allows requests up to the limit and returns `false` beyond it.
+- The `anon` key is rejected with SQL error `42501` on both a direct table select and an RPC call, so the public key cannot read or write session data.
+- `POST /api/overwolf/session` returns 200 with `stored: true`, then 200 with `duplicate: true` for the same `session_id`; 422 for a `damage_dealt` payload; 400 for a missing `session_id`; 204 with CORS headers for `OPTIONS`.
+- Stored rows drop unknown keys (`unknown_key`, `secret`), normalize `player_id` to lowercase, normalize `platform`, and mark localhost traffic as `is_internal: true`.
+- End-to-end through the harness: the app posts over real HTTP, exactly one row lands for two `matchEnd` events, and the client queue empties.
+- Network-down recovery: the summary stays queued with `network_error`, survives a simulated app restart, and reaches the database on the next flush.
+
+Note: Supabase's `service_role` has `BYPASSRLS`, so RLS alone does not gate it. Protection for this table comes from RLS plus revoking `anon`/`authenticated` table grants and function `EXECUTE`. A throwaway test role must be created with `bypassrls` to reflect production behaviour.
 
 ## Observed vs Official (keep separated)
 

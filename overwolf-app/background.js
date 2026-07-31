@@ -24,7 +24,9 @@
 
   // BGMS 세션 요약 수신 엔드포인트(app/api/overwolf/session).
   // 전송은 사용자가 데스크탑 창에서 핸드오프를 켰을 때만 수행한다.
-  var SESSION_ENDPOINT = "https://bgms.kr/api/overwolf/session";
+  // 개발 하네스에서 로컬 서버로 붙여 검증할 때만 window.bgmsDevEndpoint로 덮어쓴다.
+  // Overwolf 런타임에는 이 값이 존재하지 않으므로 항상 운영 엔드포인트를 사용한다.
+  var SESSION_ENDPOINT = window.bgmsDevEndpoint || "https://bgms.kr/api/overwolf/session";
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
   var QUEUE_TICK_MS = 30000;
 
