@@ -4,9 +4,10 @@
 
 ## 문서 기준과 범위
 
-- 기준 확인일: 2026-07-31
+- 기준 확인일: 2026-08-01 (경쟁 앱 조사 및 사용자 가치 기준 추가), 공식 API 기준 확인일 2026-07-31
 - 기준 문서: Overwolf API Overview, Manifest file, Games IDs, Sample App Components, Real-time Game Events, Verifying events for your app, PUBG Game Events, Media/Replays, Notifications, Hotkeys, Language, Windows, OBS, OIDC, Subscriptions 공식 문서
 - 이 문서는 공식 문서의 API 카테고리와 PUBG GEP feature를 빠짐없이 훑기 위한 작업 지도다.
+- API 가능성과 별개로 사용자 가치 판단 기준을 함께 둔다. Overwolf appstore PUBG 카테고리와 PUBG 개발자 포털 featured apps 조사 결과를 근거로 한다.
 - 실제 구현 전에는 해당 API의 최신 문서를 다시 확인한다. Overwolf 기능, permission, 지원 게임, unpacked app 제한은 바뀔 수 있다.
 - 공식 문서와 이 문서가 충돌하면 공식 문서를 먼저 확인하고, AGENTS.md와 이 문서를 함께 갱신한다.
 
@@ -18,6 +19,43 @@
 - PUBG 데이터 기반 핵심 기능은 구독자 전용으로 잠그지 않는다.
 - Overwolf 클라이언트에 Supabase Service Role Key나 서버 비밀키를 포함하지 않는다.
 - 영상, 스크린샷, 계정, 알림, 구독, 외부 서비스 연동은 각각 별도 권한, 사용자 동의, 저장 정책, 심사 리스크를 먼저 검토한다.
+- **게임이 이미 화면에 보여주는 정보를 오버레이에 중복 표시하지 않는다.** 아래 "사용자 가치 기준" 절을 따른다.
+
+## 사용자 가치 기준 (2026-08-01 추가)
+
+기술 실현 가능성과 별개로, 기능을 추가하기 전에 사용자 관점에서 아래를 통과해야 한다. 경쟁 앱 조사(같은 날짜) 결과 현재 오버레이 구성이 이 기준을 통과하지 못한다는 점이 확인됐다.
+
+1. **배그 기본 HUD가 이미 보여주는 정보인가?** 그렇다면 오버레이에 넣지 않는다. 킬 수, 생존자 수, 체력, 무기 상태, 킬 로그는 모두 게임 내장 HUD와 킬피드에 이미 있다.
+2. **앱 내부 상태가 아니라 플레이어에게 의미 있는 정보인가?** 전송 대기 건수, GEP 진단, 서비스 상태는 앱 상태이며 사용자 가치가 아니다. 문제가 있을 때만 노출한다.
+3. **BGMS만 할 수 있는 일인가?** 단순 카운터와 매치 히스토리는 경쟁 앱이 이미 무료로 제공한다. BGMS의 고유 자산은 텔레메트리 기반 맵/동선 분석이다.
+4. **실시간이어야 하는 이유가 있는가?** 없으면 사후 분석으로 옮긴다. 실시간 정책 리스크를 피하면서 BGMS 강점에 붙는다.
+
+### 경쟁 앱 조사 결과 (2026-08-01)
+
+출처: Overwolf appstore PUBG 카테고리, PUBG 개발자 포털 featured apps.
+
+| 앱 | 제공 내용 | BGMS와의 관계 |
+| --- | --- | --- |
+| Statsly | 매치 히스토리, 사후 분석(킬/어시스트/로드아웃/생존 시간/타임라인), 무료 광고형 | 사실상 대표 경쟁자. 숫자·타임라인 중심이며 맵 분석은 없다 |
+| Match Bar (PUBG featured) | 세션을 따라가며 라이브 게임 데이터를 기록해 사후 분석에 사용 | **아키텍처가 우리와 거의 동일하다.** 단순 세션 기록만으로는 차별화가 안 된다 |
+| Outplayed | 킬/데스 자동 클립 녹화 | Phase 3 `media.replays` 후보와 겹친다 |
+| Ouch | 플레이 중 사망 장면 리뷰 | 프레이밍이 BGMS에 가장 잘 맞는다. 아래 참고 항목 |
+| RazerShot | 에임 훈련(리코일/트래킹/플릭) | 영역이 다르다 |
+| PUBGUmbra | 최근 14일 기준 마주친 상대 정보 | 영역이 다르다 |
+
+Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), BUFF(보상), Insights Capture, Mobalytics 등은 크로스게임이거나 배그 전용이 아니다.
+
+### 차별화 포지션
+
+경쟁 앱 전부가 다루지 않는 영역은 맵 기반 위치·동선 분석이다. Statsly는 숫자, Outplayed는 영상, Ouch는 사망 클립이다.
+
+따라서 BGMS의 차별화는 실시간이 아니라 **사후**에 둔다. 매치가 끝나면 GEP 요약이 넘어가고, BGMS 웹에서 공식 API 텔레메트리로 동선·자기장·교전 지점을 맵 위에 보여주는 흐름이다. 이 구조에서 GEP는 트리거 역할만 하고 분석 근거는 공식 API가 되므로, 실시간 위치 금지 원칙을 지키면서 경쟁 앱이 못 하는 영역을 차지한다.
+
+### 참고할 경쟁 앱 패턴
+
+- **Ouch의 사망 리뷰 프레이밍**: GEP가 `death`와 `killer`를 실시간으로 주므로 그 순간을 북마크해 두고, 사후에 텔레메트리로 해당 지점의 맵 상황을 보여준다. 현재 구독 중인 feature만으로 가능하다.
+- **Statsly의 무료 광고형 모델**: PUBG API 약관 Exclusive Access 금지 조항 때문에 데이터 기능을 유료로 잠글 수 없다. 광고 제거만 유료로 두는 구조가 정책과 자연스럽게 맞는다. Phase 7 방향과 일치한다.
+- **Outplayed의 자동 하이라이트**: Phase 3 `media.replays` 항목과 동일하다. `VideoCaptureSettings` 권한, 저장 용량, 사용자 동의 검증이 선행 조건이다.
 
 ## 공식 문서 기준 기능 지도
 
@@ -62,20 +100,20 @@
 | Feature | 공식 제공 내용 | BGMS 판단 | 단계 | 주의 |
 | --- | --- | --- | --- | --- |
 | `gep_internal` | GEP local/public version 정보 | 진단용으로 이미 사용 | Phase 1 | 구독하지 않아도 수신됨. 디버그 패널에만 표시 |
-| `kill` | kills, headshots, total_damage_dealt, max_kill_distance, kill/headshot/damage_dealt/fire 이벤트 | `kill` 이벤트와 kills 카운터만 허용 | Phase 1 | `damage_dealt`, `total_damage_dealt`, 실시간 DPS 금지. `headshots`/`max_kill_distance`는 Phase 1.5 후보 |
+| `kill` | kills, headshots, total_damage_dealt, max_kill_distance, kill/headshot/damage_dealt/fire 이벤트 | `kill` 이벤트와 kills 카운터 허용. `headshots`/`max_kill_distance` 추가 검토 | Phase 1 / 1.5 | `damage_dealt`, `total_damage_dealt`, 실시간 DPS 금지. kills 카운터는 게임 HUD와 중복이라 Phase 1.5에서 축소 검토. `headshots`/`max_kill_distance`는 게임이 매치 중 표시하지 않으므로 추가 우선순위가 높다 |
 | `revived` | 로컬 플레이어 revive 이벤트 | 허용 | Phase 1 | 표시용 카운터만 사용 |
 | `death` | death, damageTaken 이벤트 (+ status 엔드포인트에만 있는 `knockedout`) | `death`, `knockedout` 허용 | Phase 1 | `damageTaken`은 실시간 피해성 신호라 차단. `knockedout`은 문서 미기재라 보조 표시로만 사용 |
 | `killer` | 로컬 플레이어를 죽인 killer nickname | 허용 | Phase 1 | 신뢰도 높은 분석 근거로 사용하지 않음 |
 | `match` | mode, match_id, matchStart, matchEnd | 허용 | Phase 1 | matchEnd 중복 수신 idempotent 필요 |
 | `match_info` | pseudo_match_id | 허용 | Phase 1 | `match_id`와 `pseudo_match_id` 모두 안전 처리 |
-| `rank` | 종료 시 순위/총원 | 후보 | Phase 2 | info key가 `match_info.me`로 `me` feature와 겹치므로 feature 기준 분기 필수 |
+| `rank` | 종료 시 순위/총원 | 후보 (우선순위 상향) | Phase 2 | info key가 `match_info.me`로 `me` feature와 겹치므로 feature 기준 분기 필수. 사후 요약의 핵심 지표이며 게임 결과 화면을 놓친 경우 가치가 있다 |
 | `counters` | ping 등 성능 카운터 | 후보 | Phase 4 | 성능 HUD 후보, 핵심 분석과 분리 |
 | `location` | 로컬 좌표 | 금지 | Phase 3+ 별도 승인 | Phase 0~1에서 실시간 미니맵/좌표 처리 금지 |
-| `me` | health, weaponState, stance, view, movement 등 로컬 상태 | health(ko_health 포함)/weaponState만 허용 | Phase 1 | 추가 상태 표시 확대는 HUD 복잡도와 심사 리스크 검토 |
+| `me` | health, weaponState, stance, view, movement 등 로컬 상태 | health(ko_health 포함)/weaponState만 허용 | Phase 1 | 추가 상태 표시 확대는 HUD 복잡도와 심사 리스크 검토. health/weaponState는 게임 HUD와 중복이므로 Phase 1.5에서 표시 축소 검토. `ko_health` 기반 KO 표시는 게임 표현과 달라 판단 보류 |
 | `team` | nicknames, team_location, team_index | 대부분 보류/금지 | Phase 3+ 별도 승인 | `team_location` 금지, nicknames/team_index도 개인정보/표시 목적 검토 필요 |
 | `phase` | lobby/loading_screen/airfield/aircraft/freefly/landed | 허용 | Phase 1 | overlay 상태 표시 핵심. 관측값 `starting` 별도 기록 |
-| `map` | 현재 맵 이름 | 후보 | Phase 2 | 위치 없이 맵 이름만 표시하는 것은 후보, 미니맵으로 연결 금지 |
-| `roster` | 전체 플레이어 roster와 out 상태 | 보수적 허용 | Phase 1 | status key는 `roster`, 실제 info key는 `roster_XX` |
+| `map` | 현재 맵 이름 | 후보 | Phase 2 | 위치 없이 맵 이름만 표시하는 것은 후보, 미니맵으로 연결 금지. 사후 요약에서 BGMS 맵 분석과 연결하는 키로는 가치가 있다 |
+| `roster` | 전체 플레이어 roster와 out 상태 | 보수적 허용 | Phase 1 | status key는 `roster`, 실제 info key는 `roster_XX`. 생존자 수는 게임 HUD와 중복이라 Phase 1.5에서 표시 축소 검토 |
 | `victimName` | 문서 미기재. status 엔드포인트에서 state 0(unsupported) | 사용 안 함 | 보류 | 지원 상태가 되면 재검토 |
 
 ## 심사와 패키징 체크포인트
@@ -111,7 +149,31 @@
 - GEP Simulator/실게임에서 `me`, `roster`, `knockedout` 실제 수신 재확인
 - Developer Console 제출용 store listing/아이콘/스크린샷 정리
 - `.opk` 패키징 후 unpacked 제한 기능 재확인
-- `headshots`, `max_kill_distance`, `rank`, `map` 표시 여부 결정 (Phase 1.5/2)
+
+### Phase 1.5 오버레이 재구성 (신규, 2026-08-01)
+
+목표는 오버레이를 "게임 HUD 복제"에서 "게임이 안 보여주는 것"으로 바꾸는 것이다. 위 사용자 가치 기준 1번을 통과하지 못하는 현재 구성을 정리한다.
+
+제거 또는 축소 검토 대상 (배그 기본 HUD와 중복):
+
+- 킬 수: 게임 내장 HUD에 이미 있다
+- 생존자 수: 게임 화면 상단에 이미 있다
+- 체력: 게임 하단 체력바에 이미 있다. 단 `ko_health` 기반 KO 표시는 게임 표현과 다르므로 판단 보류
+- 무기 상태: 게임 하단 무기 슬롯에 이미 있다. 현재도 화면에는 안 보이고 스크린리더용으로만 존재한다
+- 최근 이벤트: 킬피드와 겹친다. 팀원 기절 후 본인 마무리처럼 킬피드가 놓치는 경우만 남길지 검토
+
+추가 검토 대상 (게임이 안 보여주는 정보):
+
+- `headshots`, `max_kill_distance` (`kill` feature). 매치 중 누적값을 게임은 표시하지 않는다. 허용 feature 안에 있어 Phase 1 범위로 처리 가능하다
+- `rank` (종료 시 순위/총원). info key가 `match_info.me`로 `me`와 겹치므로 feature 기준 분기가 필수다
+- `map` (맵 이름). 위치 없이 이름만 표시하는 것은 후보이며 미니맵으로 연결하지 않는다
+
+진단 패널 처리:
+
+- 데스크탑 진단 14항목은 개발자 도구다. 기본 접힘으로 바꾸고 `isServiceDegraded`가 true일 때 또는 사용자가 펼칠 때만 노출한다
+- 오버레이 debug 모드는 유지한다. 실게임 검증에 필요하다
+
+이 단계는 새 permission이나 금지 데이터를 쓰지 않으므로 Phase 1 범위에서 진행 가능하다. 다만 표시 항목 변경은 store listing 문구와 스크린샷에 영향을 주므로 제출 전에 확정한다.
 
 ### Phase 2 세션 handoff (전송 경로 완료, 분석 연계 미착수)
 
@@ -126,9 +188,18 @@
 
 남은 항목:
 
-- 저장된 세션 요약을 BGMS 웹 분석 화면과 연결하는 UI (현재는 적재만 한다)
+**최우선 (출시 가치의 최소 조건)**: 저장된 세션 요약을 BGMS 웹에서 볼 수 있는 화면. 현재는 적재만 하므로 사용자 입장에서 "보냈는데 볼 곳이 없는" 상태다. 이 화면이 없으면 앱을 켤 이유를 설명할 수 없다.
+
+- 세션 요약 목록과 상세 화면. `overwolf_session_events`를 읽는 경로가 웹에 아직 하나도 없다
+- 오버레이 또는 데스크탑 창에서 해당 화면으로 나가는 링크. `utils.openUrlInDefaultBrowser` 사용 후보이며 현재 앱에는 외부 링크가 없다
+- 세션 요약과 공식 API 매치를 `match_id`로 연결. GEP `match_id`가 공식 API match id와 동일한 형식인지 실게임에서 확인이 필요하다
+
+그다음:
+
 - `rank`, `map` 같은 사후 요약 보조 필드 추가 여부 결정
 - 세션 요약을 근거로 사후 분석을 자동 트리거하는 흐름. PUBG API 직접 호출 금지와 기존 레이트리밋 경로 준수가 전제이며 별도 승인이 필요하다
+
+차별화 연결점: 이 화면이 단순 숫자 요약이면 Statsly, Match Bar와 구분되지 않는다. BGMS 텔레메트리 맵 분석으로 이어지는 진입점이 되어야 한다. 위 "차별화 포지션" 절을 따른다.
 
 ### Phase 3 하이라이트와 캡처
 
@@ -141,6 +212,11 @@
 - 캡처 저장 위치, 용량 제한, 사용자 opt-in 설정 필수
 - 캡처 시작/중지/실패 이벤트와 파일 삭제 UX를 같이 설계
 - 캡처 기능은 Phase 1 오버레이보다 권한과 성능 리스크가 크므로 별도 승인 후 구현
+
+영상 없이 먼저 할 수 있는 것 (권한 불필요, 우선 검토):
+
+- `death`와 `killer` 수신 시점을 세션 요약에 타임스탬프로 남기고, 사후에 BGMS 웹에서 그 시점의 텔레메트리 맵 상황을 보여준다. Ouch의 사망 리뷰 프레이밍을 BGMS 맵 분석 강점에 붙이는 조합이다
+- 현재 구독 중인 feature만 쓰고 새 permission이 없으므로, `media` 권한 검증보다 먼저 진행할 수 있다. 다만 서버 스키마와 웹 화면이 걸려 있어 Phase 2 승인 범위에서 함께 다룬다
 
 ### Phase 4 개인화와 설정
 
@@ -179,6 +255,7 @@
 
 ## 기능별 결정 기준
 
+- `사용자가 켤 이유가 되는가?`: 위 "사용자 가치 기준" 4개 질문을 먼저 통과해야 한다. 기술적으로 가능하다는 것만으로는 부족하다.
 - `Phase 1에 넣을 수 있는가?`: 허용 Feature만 쓰고, 실시간 표시만 하며, 기존 BGMS 본체를 건드리지 않으면 가능하다.
 - `Phase 2 승인 대상인가?`: 서버 저장, 세션 handoff, 분석 트리거와 연결되면 Phase 2 승인 대상이다.
 - `Phase 3 이상인가?`: 위치, 영상, 스크린샷, 계정, 공유, 구독, OBS, 스트리밍은 별도 승인과 정책 검토가 필요하다.

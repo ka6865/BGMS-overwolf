@@ -22,6 +22,10 @@ Deliberately deferred to Phase 2 (needs separate approval):
 - Reading the stored summaries anywhere on `bgms.kr`. Nothing on the website consumes `overwolf_session_events` yet, and the app has no deep link into a BGMS session view. Handoff currently writes to the table and stops there.
 - Automatically triggering the BGMS analysis pipeline from a stored summary.
 
+Open product question (see `docs/extension-roadmap.md`, "사용자 가치 기준"):
+
+A competitor review on 2026-08-01 found that most of what the overlay currently shows (kills, alive count, health, weapon state, kill notices) is already on PUBG's built-in HUD and kill feed, and that the desktop window's main surface is a 14-field diagnostics panel meant for development. Statsly already covers free match history and post-match stats, and PUBG's featured Match Bar uses the same live-session-to-post-match architecture as this app. The roadmap now tracks a Phase 1.5 pass to replace duplicated HUD fields with data the game does not show (`headshots`, `max_kill_distance`, `rank`, `map`) and to collapse diagnostics by default. Deciding this before the store submission matters, because it changes the listing copy and screenshots.
+
 ## Scope
 
 - Default language: English (Korean is an optional local setting)
