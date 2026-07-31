@@ -4,7 +4,7 @@
 
 ## 문서 기준과 범위
 
-- 기준 확인일: 2026-07-30
+- 기준 확인일: 2026-07-31
 - 기준 문서: Overwolf API Overview, Manifest file, Games IDs, Sample App Components, Real-time Game Events, Verifying events for your app, PUBG Game Events, Media/Replays, Notifications, Hotkeys, Language, Windows, OBS, OIDC, Subscriptions 공식 문서
 - 이 문서는 공식 문서의 API 카테고리와 PUBG GEP feature를 빠짐없이 훑기 위한 작업 지도다.
 - 실제 구현 전에는 해당 API의 최신 문서를 다시 확인한다. Overwolf 기능, permission, 지원 게임, unpacked app 제한은 바뀔 수 있다.
@@ -93,7 +93,7 @@
 
 목표는 심사 가능한 오버레이 MVP다.
 
-완료 (2026-07-30 기준):
+완료 (2026-07-31 기준):
 
 - Overwolf 로드, manifest, launch_events, background controller 안정화
 - base game id `10906` 기준 targeting, 런타임 instance id 환산
@@ -102,6 +102,9 @@
 - 리스너 remove-then-add, `setRequiredFeatures` 성공 판정 강화
 - 금지 payload(`damage_dealt`, `total_damage_dealt`, `damageTaken`, `location`)를 리듀서에서 차단하고 진단에만 기록
 - compact HUD + click-through, 영어 기본 UI, 한국어 optional, Overwolf 언어 기반 초기 선택
+- 오버레이 표시 설정(모드/투명도/위치)과 데스크탑 진단 패널
+- 세션 핸드오프 실동작화: opt-in 동의, BGMS 닉네임/플랫폼 입력, 로컬 큐 + 백오프 재시도, 오버레이 대기 표시
+- BGMS 서버 수신 경로 구현: `app/api/overwolf/session`, `overwolf_session_events` 테이블, session_id 기준 idempotency, 세션 쿼터, 90일 보존 정리
 
 남은 항목:
 
@@ -110,16 +113,22 @@
 - `.opk` 패키징 후 unpacked 제한 기능 재확인
 - `headshots`, `max_kill_distance`, `rank`, `map` 표시 여부 결정 (Phase 1.5/2)
 
-### Phase 2 세션 handoff
+### Phase 2 세션 handoff (전송 경로 완료, 분석 연계 미착수)
 
 목표는 매치 종료 후 BGMS 웹 분석으로 자연스럽게 이어지는 것이다.
 
-- `matchEnd` 이후 세션 요약 1회 전송
-- 중복 `matchEnd` idempotent 처리
-- `session_id`, `match_id`, `pseudo_match_id`, `client_environment`, `gep_summary` 스키마 확정
-- rank, map, gep_internal version 같은 사후 요약 보조 필드 검토
+완료 (2026-07-31):
+
+- `matchEnd` 이후 세션 요약 1회 전송, 중복 `matchEnd` idempotent 처리(클라이언트 + 서버 양쪽)
+- `session_id`, `match_id`, `pseudo_match_id`, `player_id`, `platform`, `client_environment`, `gep_summary` 스키마 확정
 - BGMS 서버 신규 네임스페이스만 사용: `app/api/overwolf/session/route.ts`
-- PUBG API 직접 호출 금지, 기존 BGMS 레이트리밋 경로만 사용
+- 전송 실패 시 로컬 큐 보존과 지수 백오프 재시도, 영구 거부(4xx) 구분
+
+남은 항목:
+
+- 저장된 세션 요약을 BGMS 웹 분석 화면과 연결하는 UI (현재는 적재만 한다)
+- `rank`, `map` 같은 사후 요약 보조 필드 추가 여부 결정
+- 세션 요약을 근거로 사후 분석을 자동 트리거하는 흐름. PUBG API 직접 호출 금지와 기존 레이트리밋 경로 준수가 전제이며 별도 승인이 필요하다
 
 ### Phase 3 하이라이트와 캡처
 

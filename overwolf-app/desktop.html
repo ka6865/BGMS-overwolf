@@ -34,6 +34,34 @@
       </section>
 
       <section class="settings-grid" aria-label="Overlay settings">
+        <article class="panel handoff-panel">
+          <h2 data-i18n="handoffTitle">BGMS session handoff</h2>
+          <p class="panel-note" data-i18n="handoffNote">
+            When enabled, BGMS Companion sends one compact match summary to your BGMS account after each match ends.
+          </p>
+
+          <label class="control-row">
+            <span class="control-label" data-i18n="handoffToggleLabel">Send session summary to BGMS</span>
+            <input id="handoff-enabled" type="checkbox">
+          </label>
+
+          <label class="control-group">
+            <span class="control-label" data-i18n="playerNameLabel">BGMS nickname</span>
+            <input id="handoff-player-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="PUBG in-game name">
+          </label>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="platformLabel">Platform</span>
+            <div class="segmented-control" role="group" aria-label="Platform">
+              <button type="button" data-service-setting="platform" data-value="steam">Steam</button>
+              <button type="button" data-service-setting="platform" data-value="kakao">Kakao</button>
+            </div>
+          </div>
+
+          <p class="handoff-status" id="handoff-status" role="status">--</p>
+          <button type="button" id="handoff-retry" class="text-button" data-i18n="handoffRetry">Retry pending handoff</button>
+        </article>
+
         <article class="panel settings-panel">
           <h2 data-i18n="settingsTitle">Overlay settings</h2>
 
@@ -148,6 +176,7 @@
     </main>
 
     <script src="i18n.js"></script>
+    <script src="settings.js"></script>
     <script src="desktop.js"></script>
   </body>
 </html>

@@ -1,10 +1,10 @@
 {
   "name": "bgms-overwolf-app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
-  "description": "BGMS Companion Overwolf app (PUBG GEP overlay). Tests cover the pure GEP payload reducer only.",
+  "description": "BGMS Companion Overwolf app (PUBG GEP overlay). Tests cover the pure GEP reducer, session queue, settings store, and background wiring.",
   "scripts": {
-    "test": "node --test overwolf-app/tests/*.test.js"
+    "test": "node --test --test-force-exit overwolf-app/tests/*.test.js"
   },
   "license": "UNLICENSED"
 }

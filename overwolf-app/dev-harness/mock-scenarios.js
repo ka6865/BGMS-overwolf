@@ -128,6 +128,40 @@
         window.mockGep.fireBulkInfoUpdate({ match_info: { match_id: "match-mock-fail-123" } }, "match");
       }, 500);
       // me와 roster 데이터는 의도적으로 전송하지 않아 UI에 '--' 상태가 유지됨
+    },
+
+    /*
+     * 13. 세션 핸드오프 시나리오
+     *
+     * 실제 BGMS 서버를 호출하지 않고 응답 코드만 흉내내서 큐 동작을 확인한다.
+     * mock-overwolf.js가 window.fetch를 가로채므로 응답 코드만 바꿔주면 된다.
+     */
+    enableHandoff: function (playerName) {
+      var name = playerName || "MockPlayer";
+
+      console.log("Scenario: enabling session handoff for " + name);
+      window.bgmsSettings.write({
+        handoffEnabled: true,
+        playerName: name,
+        platform: "steam"
+      });
+
+      if (window.bgmsController && typeof window.bgmsController.applyServiceSettings === "function") {
+        window.bgmsController.applyServiceSettings(window.bgmsSettings.read());
+      }
+    },
+
+    setHandoffResponse: function (status) {
+      console.log("Scenario: session endpoint will respond " + String(status));
+      window.mockGep.setSessionResponseStatus(Number(status));
+    },
+
+    retryHandoff: function () {
+      console.log("Scenario: manual handoff retry.");
+
+      if (window.bgmsController && typeof window.bgmsController.retryHandoff === "function") {
+        window.bgmsController.retryHandoff();
+      }
     }
   };
 })();

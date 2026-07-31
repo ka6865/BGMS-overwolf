@@ -79,7 +79,7 @@
     extensions: {
       current: {
         getManifest: function (callback) {
-          callback({ meta: { version: "0.2.0" } });
+          callback({ meta: { version: "0.3.0" } });
         }
       }
     },
@@ -124,8 +124,11 @@
     }
   };
 
-  // status 엔드포인트 호출만 픽스처로 가로채고 나머지는 원래 fetch로 넘긴다.
+  // status 엔드포인트와 BGMS 세션 엔드포인트를 픽스처로 가로채고 나머지는 원래 fetch로 넘긴다.
+  // 하네스에서 실제 운영 서버로 요청이 나가지 않게 하는 것이 목적이다.
   var originalFetch = window.fetch ? window.fetch.bind(window) : null;
+  var sessionResponseStatus = 200;
+  var sessionRequests = [];
 
   window.fetch = function (url, options) {
     if (typeof url === "string" && url.indexOf("game-events-status.overwolf.com") !== -1) {
@@ -134,6 +137,19 @@
         status: 200,
         json: function () {
           return Promise.resolve(window.mockGep.serviceStatus);
+        }
+      });
+    }
+
+    if (typeof url === "string" && url.indexOf("/api/overwolf/session") !== -1) {
+      sessionRequests.push(options && options.body ? String(options.body) : "");
+      console.log("Harness: session handoff intercepted, responding " + String(sessionResponseStatus));
+
+      return Promise.resolve({
+        ok: sessionResponseStatus >= 200 && sessionResponseStatus < 300,
+        status: sessionResponseStatus,
+        json: function () {
+          return Promise.resolve({ success: sessionResponseStatus === 200 });
         }
       });
     }
@@ -237,6 +253,12 @@
         errors: errorListeners.length,
         gameInfo: gameInfoListeners.length
       };
+    },
+    setSessionResponseStatus: function (status) {
+      sessionResponseStatus = Number(status) || 200;
+    },
+    sessionRequests: function () {
+      return sessionRequests.slice();
     }
   };
 })();

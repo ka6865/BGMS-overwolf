@@ -43,6 +43,7 @@
     elements.weaponState = document.getElementById("weapon-state");
     elements.lastEvent = document.getElementById("last-event");
     elements.serviceWarning = document.getElementById("service-warning");
+    elements.handoffIndicator = document.getElementById("handoff-indicator");
     elements.debugGep = document.getElementById("debug-gep");
     elements.debugGame = document.getElementById("debug-game");
     elements.debugLast = document.getElementById("debug-last");
@@ -132,6 +133,14 @@
     toggleHidden(elements.serviceWarning, !isDegraded);
     setText(elements.serviceWarning, isDegraded
       ? translateServiceStatus(state.serviceStatusState) + (state.gepErrorReason ? " / " + state.gepErrorReason : "")
+      : "");
+
+    // 전송 대기 중인 세션 요약이 있을 때만 표시한다. 정상 흐름에서는 노출하지 않는다.
+    var hasPendingHandoff = Number(state.handoffPending) > 0;
+
+    toggleHidden(elements.handoffIndicator, !hasPendingHandoff);
+    setText(elements.handoffIndicator, hasPendingHandoff
+      ? t("handoffPending") + " " + String(state.handoffPending)
       : "");
 
     setText(elements.debugGep, t("gep") + " " + (state.gepStatus || "idle"));

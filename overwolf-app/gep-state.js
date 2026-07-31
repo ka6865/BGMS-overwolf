@@ -97,6 +97,11 @@
       summaryReady: false,
       summarySent: false,
       summaryAttempts: 0,
+      handoffEnabled: false,
+      handoffPending: 0,
+      handoffOutcome: "",
+      handoffLastError: "",
+      handoffNextAttemptAt: null,
       gepStatus: "idle",
       gepErrorReason: "",
       gepLocalVersion: "",
@@ -143,6 +148,11 @@
       "detectedGameId",
       "detectedClassId",
       "detectedGameRunning",
+      "handoffEnabled",
+      "handoffPending",
+      "handoffOutcome",
+      "handoffLastError",
+      "handoffNextAttemptAt",
       "lastFeature",
       "lastKey",
       "lastRawValue",
@@ -861,11 +871,17 @@
     });
   }
 
-  function buildSessionSummary(state, clientEnvironment) {
+  /*
+   * 서버(app/api/overwolf/session)가 허용하는 필드만 담는다.
+   * identity(player_id/platform)는 GEP 닉네임이 아니라 사용자가 앱에서 입력한 값을 받는다.
+   */
+  function buildSessionSummary(state, clientEnvironment, identity) {
     return {
       session_id: state.sessionId,
       match_id: state.matchId || null,
       pseudo_match_id: state.pseudoMatchId || null,
+      player_id: identity && identity.playerName ? identity.playerName : null,
+      platform: identity && identity.platform ? identity.platform : null,
       gep_summary: {
         effective_match_id: state.effectiveMatchId || null,
         match_mode: state.matchMode || null,

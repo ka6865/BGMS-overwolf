@@ -1,6 +1,6 @@
 # Phase 0-1 Validation Checklist
 
-Last updated: 2026-07-30
+Last updated: 2026-07-31
 
 ## Automated Checks (no game required)
 
@@ -11,7 +11,10 @@ npm test   # node --test overwolf-app/tests/*.test.js
 ```
 
 - `gep-state.test.js` covers PUBG official payload shapes: phase, match, match_info, kill, roster, me (health/weaponState), killer, knockedout, gep_internal, blocked payloads, matchEnd idempotency, session summary shape.
-- `background-controller.test.js` loads `dev-harness/mock-overwolf.js` in a vm context and covers PUBG detection via class id, `setRequiredFeatures` success path, `getInfo` snapshot, duplicate `matchEnd`, `onError`, game switch reset, and duplicate listener prevention.
+- `session-queue.test.js` covers enqueue de-duplication, corrupted queue recovery, backoff scheduling, permanent 4xx rejection, retry on 429/5xx/network error, and max-attempt drop.
+- `settings.test.js` covers handoff consent defaults, nickname sanitization, platform validation, corrupted storage recovery, and the send precondition.
+- `background-controller.test.js` loads `dev-harness/mock-overwolf.js` in a vm context and covers PUBG detection via class id, `setRequiredFeatures` success path, `getInfo` snapshot, duplicate `matchEnd`, `onError`, game switch reset, duplicate listener prevention, and the full handoff path (off, missing nickname, single send, blocked-field absence, 503 retry, 422 rejection).
+- Server-side checks live in the BGMS repository: `npm run verify:overwolf` covers payload normalization, quota, idempotency, and migration security invariants.
 - Add a failing test first whenever a real-game payload does not parse as expected.
 
 Manual UI harness (browser, no Overwolf client):
@@ -20,7 +23,7 @@ Manual UI harness (browser, no Overwolf client):
 open overwolf-app/dev-harness/mock.html
 ```
 
-Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, ignored `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, and the GEP-data-missing failure case.
+Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, ignored `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, the GEP-data-missing failure case, and session handoff with 200/503/422 responses. The harness intercepts `/api/overwolf/session`, so no request reaches production.
 
 ## Phase 0 Manual Checks
 
@@ -55,10 +58,22 @@ Scenarios cover match start, kill, knock/revive, roster elimination, death + kil
 - Confirm the overlay is click-through and does not steal mouse or keyboard input in-game (`clickthrough`, `ignore_keyboard_events`).
 - Confirm closing and reopening the overlay does not register duplicate GEP listeners.
 - Confirm matchEnd duplicate events do not trigger multiple summary sends in one match.
+- Confirm the handoff toggle is off on a fresh install and no request is sent until the user enables it and enters a nickname.
+- Confirm a queued summary survives an app restart and is sent on the next launch.
+- Confirm the overlay shows the pending-handoff count only while a summary is waiting.
 - Confirm the desktop diagnostics panel shows: GEP status, event service status, class id + instance id, match id, seen/supported/missing/ignored features, GEP version, GEP error reason, session handoff state.
 - Confirm the overlay shows a warning line when the event service status is yellow/red or when `onError` fires.
 - Confirm HP shows `KO` only when `health` is 0 while `ko_health` remains above 0.
-- Keep `SESSION_ENDPOINT` empty in `background.js` until the BGMS server endpoint is approved and implemented.
+- Confirm `SESSION_ENDPOINT` in `background.js` points at the deployed BGMS endpoint (`https://bgms.kr/api/overwolf/session`) and that the endpoint responds before enabling handoff for users.
+
+## Server Endpoint Checks (BGMS repository)
+
+- Apply `supabase/migrations/20260731070000_overwolf_gep_session_events.sql` before enabling handoff in production.
+- Confirm `overwolf_session_events` and `overwolf_session_quota` exist with RLS enabled and no anon/authenticated grants.
+- Confirm a duplicate POST with the same `session_id` returns `duplicate: true` and does not create a second row.
+- Confirm a payload containing `damage_dealt`, `location`, or `team_location` is rejected with 422.
+- Confirm repeated posts for one `session_id` hit the 429 quota after 12 requests in 10 minutes.
+- Confirm the daily cleanup job (`scripts/cleanup_pubg_cache.ts`) removes session rows older than 90 days.
 
 ## Observed vs Official (keep separated)
 
@@ -74,4 +89,6 @@ Scenarios cover match start, kill, knock/revive, roster elimination, death + kil
 - No location, team location, zone, coordinate, or minimap UI.
 - No direct PUBG API request from the Overwolf client.
 - No Supabase service role key or private credential in client files.
+- Session handoff is opt-in and off by default. The client posts only to the BGMS session endpoint.
+- The server stores only whitelisted summary keys; unknown keys are dropped and blocked keys are rejected.
 - English is the default manifest, desktop, overlay, and store listing language. Korean is optional and only auto-applied when the Overwolf client language is Korean and the user has not made a choice.

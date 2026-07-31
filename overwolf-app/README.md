@@ -11,7 +11,18 @@ This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submi
 - GEP subscription owner: `background.js`
 - GEP payload parsing owner: `gep-state.js` (pure module, unit tested)
 - In-game window role: render state from the background controller only
-- Optional post-match session summary handoff: disabled until `SESSION_ENDPOINT` is set in `background.js`
+- Post-match session summary handoff: live against `https://bgms.kr/api/overwolf/session`, opt-in per user
+
+## Session Handoff
+
+After a match ends, BGMS Companion can send one compact session summary to BGMS.
+
+- Off by default. The user must enable it in the desktop window and enter a BGMS nickname.
+- The summary is queued in local storage first, then posted. A failed post is retried with exponential backoff (5s, 15s, 60s, 5m, 15m) and survives an app restart.
+- `4xx` responses other than `429` are treated as permanent rejections and dropped without retrying.
+- The server (`app/api/overwolf/session` in the BGMS repository) is idempotent on `session_id`, so duplicate `matchEnd` events cannot create duplicate rows.
+- The payload carries counters, phase, match identifiers, GEP version, and the user-provided nickname/platform. No damage, location, or team-location fields.
+- `session-queue.js` and `settings.js` are pure modules and unit tested.
 
 ## Explicitly Out Of Scope
 
@@ -19,7 +30,7 @@ This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submi
 - Live location, team location, minimap, zones, or coordinates
 - Direct PUBG API calls from GEP events
 - Supabase service role key or private backend credentials
-- Database writes from the Overwolf client
+- Direct database writes from the Overwolf client (the client only calls the public BGMS session endpoint)
 - Any change to BGMS core analysis APIs
 
 ## File Layout
@@ -29,6 +40,8 @@ This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submi
 | `manifest.json` | Overwolf app manifest (windows, hotkeys, game targeting, GEP version floor) |
 | `background.js` | Overwolf API side: game detection, GEP subscription, windows, network |
 | `gep-state.js` | Pure GEP payload reducer. No Overwolf API calls, unit tested |
+| `session-queue.js` | Pure session summary queue with retry/backoff, unit tested |
+| `settings.js` | Handoff consent, BGMS nickname, and platform storage, unit tested |
 | `in-game.js` / `in-game.html` | Compact HUD renderer |
 | `desktop.js` / `desktop.html` | Settings and live diagnostics window |
 | `i18n.js` | English default dictionary plus optional Korean |
@@ -41,11 +54,12 @@ This folder contains the Phase 1 Overwolf app for BGMS review and Overwolf submi
 npm test
 ```
 
-Runs `node --test overwolf-app/tests/*.test.js`. No Overwolf client, no game, and no dependencies required. `background-controller.test.js` loads the dev-harness mock API in a `vm` context to verify controller wiring.
+Runs `node --test --test-force-exit overwolf-app/tests/*.test.js`. No Overwolf client, no game, and no dependencies required. `background-controller.test.js` loads the dev-harness mock API in a `vm` context to verify controller wiring, including the handoff queue against intercepted session requests. `--test-force-exit` is required because the controller keeps a queue flush interval alive.
 
 ## Local Preview
 
-- `open overwolf-app/dev-harness/mock.html` for the interactive harness (scenario buttons for match flow, knock/revive, roster elimination, duplicate `matchEnd`, blocked payloads, GEP errors, degraded service status).
+- `open overwolf-app/dev-harness/mock.html` for the interactive harness (scenario buttons for match flow, knock/revive, roster elimination, duplicate `matchEnd`, blocked payloads, GEP errors, degraded service status, and session handoff with 200/503/422 responses).
+- The harness intercepts `/api/overwolf/session` requests, so no traffic reaches the production endpoint.
 - Opening `desktop.html` or `in-game.html` directly shows static preview state without Overwolf APIs.
 
 ## OPK Packaging

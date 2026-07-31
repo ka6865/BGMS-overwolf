@@ -16,18 +16,21 @@
   "use strict";
 
   var gepState = window.bgmsGepState;
+  var sessionQueue = window.bgmsSessionQueue;
+  var settingsStore = window.bgmsSettings;
 
   var IN_GAME_WINDOW = "in_game";
   var DESKTOP_WINDOW = "desktop";
 
-  // 서버 수신 엔드포인트가 승인/구현될 때까지 비워 둔다. 비어 있으면 전송을 시도하지 않는다.
-  var SESSION_ENDPOINT = "";
+  // BGMS 세션 요약 수신 엔드포인트(app/api/overwolf/session).
+  // 전송은 사용자가 데스크탑 창에서 핸드오프를 켰을 때만 수행한다.
+  var SESSION_ENDPOINT = "https://bgms.kr/api/overwolf/session";
+  var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
+  var QUEUE_TICK_MS = 30000;
 
   var REQUIRED_FEATURES = gepState.REQUIRED_FEATURES;
   var MAX_FEATURE_ATTEMPTS = 8;
   var RETRY_DELAY_MS = 3000;
-  var MAX_SUMMARY_ATTEMPTS = 3;
-  var SUMMARY_RETRY_DELAY_MS = 5000;
   var STATUS_ENDPOINT_TEMPLATE = "https://game-events-status.overwolf.com/{gameId}_prod.json";
 
   var OVERLAY_WIDTH = 348;
@@ -46,6 +49,8 @@
   var desktopDismissed = false;
   var appVersion = "0.0.0";
   var snapshotTimer = null;
+  var queueTimer = null;
+  var queueFlushInFlight = false;
 
   var state = gepState.createInitialState();
 
@@ -59,7 +64,7 @@
     setState(nextState);
 
     if (nextState.summaryReady && !nextState.summarySent) {
-      sendSessionSummary(1);
+      enqueueSessionSummary();
     }
   };
 
@@ -519,78 +524,154 @@
     });
   }
 
-  function sendSessionSummary(attempt) {
-    var payload;
+  /*
+   * 세션 요약 전송
+   *
+   * 전송 조건: 사용자가 핸드오프를 켜고 BGMS 닉네임을 입력한 경우에만 큐에 넣는다.
+   * 큐는 localStorage에 보존되므로 네트워크 단절이나 앱 재시작 후에도 재시도된다.
+   * 서버는 session_id 기준 idempotent 처리하므로 중복 전송은 duplicate로 흡수된다.
+   */
+  function readQueue() {
+    try {
+      return sessionQueue.normalizeQueue(JSON.parse(window.localStorage.getItem(SESSION_QUEUE_STORAGE_KEY)));
+    } catch (_error) {
+      return [];
+    }
+  }
 
-    if (!SESSION_ENDPOINT) {
-      patchState({
-        summaryReady: false,
-        lastEvent: "Session summary ready (handoff disabled)"
-      });
-      return;
+  function writeQueue(queue) {
+    var normalized = sessionQueue.normalizeQueue(queue);
+
+    try {
+      window.localStorage.setItem(SESSION_QUEUE_STORAGE_KEY, JSON.stringify(normalized));
+    } catch (_error) {
+      return normalized;
     }
 
-    if (state.summarySent || !window.fetch) {
+    return normalized;
+  }
+
+  function publishQueueState(queue, outcome) {
+    var description = sessionQueue.describeQueue(queue);
+
+    patchState({
+      handoffPending: description.pending,
+      handoffLastError: description.lastError,
+      handoffNextAttemptAt: description.nextAttemptAt,
+      handoffOutcome: outcome || state.handoffOutcome
+    });
+  }
+
+  function enqueueSessionSummary() {
+    var settings = settingsStore.read();
+    var payload;
+    var queue;
+
+    if (!settingsStore.canSendHandoff(settings)) {
+      patchState({
+        summaryReady: false,
+        handoffEnabled: settings.handoffEnabled,
+        lastEvent: settings.handoffEnabled
+          ? "Session summary skipped (BGMS nickname required)"
+          : "Session summary ready (handoff off)"
+      });
       return;
     }
 
     payload = gepState.buildSessionSummary(state, {
       version: appVersion,
       overwolf_game_id: state.detectedGameId,
-      overwolf_class_id: state.detectedClassId
+      overwolf_class_id: state.detectedClassId,
+      language: window.bgmsI18n ? window.bgmsI18n.getLanguage() : "en"
+    }, {
+      playerName: settings.playerName,
+      platform: settings.platform
     });
 
+    queue = writeQueue(sessionQueue.enqueue(readQueue(), payload));
+
     patchState({
-      summarySent: true,
       summaryReady: false,
-      summaryAttempts: attempt
+      summarySent: true,
+      handoffEnabled: true,
+      lastEvent: "Session summary queued"
     });
+    publishQueueState(queue, "queued");
+    flushSessionQueue();
+  }
+
+  function flushSessionQueue() {
+    var settings = settingsStore.read();
+    var queue = readQueue();
+    var entry;
+
+    if (queueFlushInFlight || !window.fetch || !SESSION_ENDPOINT) {
+      return;
+    }
+
+    // 사용자가 전송을 껐으면 큐는 유지하되 전송하지 않는다.
+    if (!settingsStore.canSendHandoff(settings)) {
+      publishQueueState(queue);
+      return;
+    }
+
+    entry = sessionQueue.pickDueEntry(queue);
+
+    if (!entry) {
+      publishQueueState(queue);
+      return;
+    }
+
+    queueFlushInFlight = true;
 
     window.fetch(SESSION_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-BGMS-Session-Id": payload.session_id
+        "X-BGMS-Session-Id": entry.payload.session_id
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(entry.payload)
     }).then(function (response) {
-      if (response.ok) {
-        patchState({
-          lastEvent: "Session summary sent"
-        });
-        return;
-      }
-
-      // 4xx는 재시도해도 동일하게 실패하므로 즉시 중단한다.
-      if (response.status >= 400 && response.status < 500) {
-        patchState({
-          lastEvent: "Session summary rejected"
-        });
-        return;
-      }
-
-      scheduleSummaryRetry(attempt);
+      settleQueueEntry(entry.payload.session_id, {
+        ok: response.ok,
+        status: response.status
+      });
     }).catch(function () {
-      scheduleSummaryRetry(attempt);
+      settleQueueEntry(entry.payload.session_id, {
+        ok: false,
+        status: 0
+      });
     });
   }
 
-  function scheduleSummaryRetry(attempt) {
-    if (attempt >= MAX_SUMMARY_ATTEMPTS) {
-      patchState({
-        lastEvent: "Session summary failed"
-      });
+  function settleQueueEntry(sessionId, result) {
+    var applied = sessionQueue.applyResult(readQueue(), sessionId, result);
+    var queue = writeQueue(applied.queue);
+    var messages = {
+      sent: "Session summary sent",
+      rejected: "Session summary rejected",
+      dropped: "Session summary failed",
+      retry: "Session summary retry scheduled"
+    };
+
+    queueFlushInFlight = false;
+
+    patchState({
+      lastEvent: messages[applied.outcome] || state.lastEvent
+    });
+    publishQueueState(queue, applied.outcome);
+
+    if (applied.outcome === "sent" && sessionQueue.pickDueEntry(queue)) {
+      flushSessionQueue();
+    }
+  }
+
+  function startQueueTimer() {
+    if (queueTimer) {
       return;
     }
 
-    patchState({
-      summarySent: false,
-      summaryReady: true
-    });
-
-    window.setTimeout(function () {
-      sendSessionSummary(attempt + 1);
-    }, SUMMARY_RETRY_DELAY_MS * attempt);
+    queueTimer = window.setInterval(flushSessionQueue, QUEUE_TICK_MS);
   }
 
   function subscribe(callback) {
@@ -619,9 +700,19 @@
     closeDesktop: closeDesktopWindow,
     ensureGepSubscription: ensureGepSubscription,
     applyOverlaySettings: applyOverlaySettings,
+    applyServiceSettings: function (settings) {
+      var nextSettings = settingsStore.normalize(settings);
+
+      patchState({
+        handoffEnabled: nextSettings.handoffEnabled
+      });
+      flushSessionQueue();
+    },
+    retryHandoff: flushSessionQueue,
     refreshDiagnostics: function () {
       refreshGepInfoSnapshot();
       fetchServiceStatus(state.detectedClassId);
+      flushSessionQueue();
     }
   };
 
@@ -634,5 +725,12 @@
     applyClientLanguage();
     registerHotkey();
     registerGameListeners();
+    // 이전 실행에서 전송하지 못한 요약이 있으면 이어서 처리한다.
+    patchState({
+      handoffEnabled: settingsStore.read().handoffEnabled
+    });
+    publishQueueState(readQueue());
+    flushSessionQueue();
+    startQueueTimer();
   });
 })();

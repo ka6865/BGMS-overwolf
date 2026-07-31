@@ -2,7 +2,7 @@
 
 이 문서는 Overwolf PUBG GEP 테스트 중 헷갈리지 않도록 공식 문서에서 확인한 API 호출, feature, payload 기준을 정리한다. 구현 지시가 아니라 기준표이며, 실제 구현 전에는 링크된 공식 문서를 다시 확인한다.
 
-**최근 확인일: 2026-07-30**
+**최근 확인일: 2026-07-31**
 
 ## 기준 문서
 
@@ -19,7 +19,9 @@
 
 - `gep-state.js`: GEP payload -> 세션 상태 리듀서. Overwolf API를 호출하지 않는 순수 모듈이므로 macOS/node에서 단위 테스트한다.
 - `background.js`: Overwolf API 호출(창, 게임 감지, GEP 구독, 네트워크)만 담당하고 payload 해석은 `gep-state.js`에 위임한다.
-- 테스트: `npm test` (`node --test overwolf-app/tests/*.test.js`). 실게임/Overwolf 클라이언트 의존성이 없다.
+- `session-queue.js`: 세션 요약 전송 큐. 백오프와 재시도 판정만 담당하는 순수 모듈이다.
+- `settings.js`: 핸드오프 동의, BGMS 닉네임, 플랫폼 저장. 여기에는 어떤 키나 비밀값도 담지 않는다.
+- 테스트: `npm test` (`node --test --test-force-exit overwolf-app/tests/*.test.js`). 실게임/Overwolf 클라이언트 의존성이 없다. `--test-force-exit`는 컨트롤러가 큐 flush interval을 유지하기 때문에 필요하다.
 - payload 파서를 수정할 때는 `overwolf-app/tests/gep-state.test.js`에 공식 예시 payload 기준 케이스를 함께 추가한다.
 
 ## Game ID 기준 (2026-07-30 확인)
@@ -177,6 +179,7 @@ state 코드:
 - `matchEnd`는 세션 단위로 idempotent 처리한다. 첫 수신에서만 요약 전송 대상이 되고 이후에는 `matchEndCount`만 증가한다.
 - `matchStart` 시 기존 `matchId`, `pseudoMatchId`, `effectiveMatchId`, `matchMode`와 GEP 진단값을 보존하고 카운터만 초기화한다.
 - `matchStart` 시 `session_id`는 새로 발급한다. 서버 idempotency 키가 매치 간 충돌하지 않게 하기 위함이다.
+- 2026-07-31: 서버 수신 경로가 구현되어 `matchEnd` 첫 수신 시 요약이 로컬 큐에 적재되고 BGMS 엔드포인트로 1회 전송된다. 클라이언트 중복 방지와 별개로 서버도 `session_id` PK 기준 idempotent 처리한다.
 
 ### `match_info`
 
@@ -242,4 +245,15 @@ desktop 진단을 기준으로 판단한다.
 - 미니맵
 - PUBG API 직접 호출
 - Supabase service role 또는 secret 포함
-- 서버 저장/분석 트리거 자동화 (`SESSION_ENDPOINT`는 승인 전까지 빈 문자열 유지)
+- 분석 파이프라인 자동 트리거 (세션 요약 저장은 허용되지만, 저장된 요약으로 `AnalysisEngine`이나 PUBG API 호출을 자동 시작하지 않는다. Phase 2 항목이다.)
+
+## 세션 핸드오프 기준 (2026-07-31 구현)
+
+- 엔드포인트: `POST https://bgms.kr/api/overwolf/session` (BGMS 본체 `app/api/overwolf/session/route.ts`)
+- 클라이언트는 이 엔드포인트 외에 BGMS 도메인으로 어떤 요청도 보내지 않는다. Supabase에 직접 접근하지 않는다.
+- 전송 조건: 사용자가 데스크탑 창에서 전송을 켜고 BGMS 닉네임을 입력한 경우에만. 기본값은 꺼짐이다.
+- 전송 payload 키: `session_id`, `match_id`, `pseudo_match_id`, `player_id`, `platform`, `gep_summary`, `client_environment`. 서버가 화이트리스트 밖의 키를 버리므로 클라이언트에서 임의 키를 추가해도 저장되지 않는다.
+- 재시도: 5s, 15s, 60s, 5m, 15m 백오프로 최대 5회. `429`와 `5xx`, 네트워크 오류만 재시도하고 그 외 `4xx`는 영구 거부로 간주해 큐에서 제거한다.
+- 큐는 localStorage(`bgms_companion_session_queue`)에 보존되므로 앱 재시작 후에도 이어서 전송된다.
+- `player_id`는 GEP 닉네임이 아니라 사용자가 직접 입력한 값이다. GEP 닉네임을 identity로 신뢰하지 않는다는 원칙을 유지한다.
+- Overwolf 앱 창의 origin은 `overwolf-extension://`이므로 서버 라우트에 CORS(`OPTIONS` + `Access-Control-Allow-*`)를 명시했다.

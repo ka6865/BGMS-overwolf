@@ -4,7 +4,7 @@
   "meta": {
     "name": "BGMS Companion",
     "author": "BGMS",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "minimum-overwolf-version": "0.170.0",
     "minimum-gep-version": "135.0",
     "description": "A lightweight in-game PUBG companion overlay for live session awareness and post-match BGMS handoff.",

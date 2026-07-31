@@ -9,6 +9,10 @@
     return Array.prototype.slice.call(document.querySelectorAll("[data-setting='" + setting + "']"));
   }
 
+  function queryServiceSettingButtons(setting) {
+    return Array.prototype.slice.call(document.querySelectorAll("[data-service-setting='" + setting + "']"));
+  }
+
   function getController() {
     if (typeof overwolf === "undefined" || !overwolf.windows || !overwolf.windows.getMainWindow) {
       return null;
@@ -95,6 +99,86 @@
     }
   }
 
+  /*
+   * 서버 연동 설정(핸드오프 동의, 닉네임, 플랫폼)을 관리한다.
+   * 전송은 기본값 꺼짐이며 사용자가 여기서 명시적으로 켜야 한다.
+   */
+  function syncServiceSettingsControls() {
+    var settings = window.bgmsSettings.read();
+    var enabledInput = document.getElementById("handoff-enabled");
+    var nameInput = document.getElementById("handoff-player-name");
+
+    if (enabledInput) {
+      enabledInput.checked = settings.handoffEnabled;
+    }
+
+    if (nameInput && nameInput.value !== settings.playerName) {
+      nameInput.value = settings.playerName;
+    }
+
+    queryServiceSettingButtons("platform").forEach(function (button) {
+      var isSelected = button.getAttribute("data-value") === settings.platform;
+
+      button.classList.toggle("is-selected", isSelected);
+      button.setAttribute("aria-pressed", isSelected ? "true" : "false");
+    });
+  }
+
+  function saveServiceSettings(partial) {
+    var settings = window.bgmsSettings.write(Object.assign(window.bgmsSettings.read(), partial));
+    var controller = getController();
+
+    syncServiceSettingsControls();
+
+    if (controller && typeof controller.applyServiceSettings === "function") {
+      try {
+        controller.applyServiceSettings(settings);
+      } catch (_error) {
+        return;
+      }
+    }
+  }
+
+  function bindServiceSettingsControls() {
+    var enabledInput = document.getElementById("handoff-enabled");
+    var nameInput = document.getElementById("handoff-player-name");
+    var retryButton = document.getElementById("handoff-retry");
+
+    if (enabledInput) {
+      enabledInput.addEventListener("change", function () {
+        saveServiceSettings({
+          handoffEnabled: enabledInput.checked
+        });
+      });
+    }
+
+    if (nameInput) {
+      nameInput.addEventListener("change", function () {
+        saveServiceSettings({
+          playerName: nameInput.value
+        });
+      });
+    }
+
+    queryServiceSettingButtons("platform").forEach(function (button) {
+      button.addEventListener("click", function () {
+        saveServiceSettings({
+          platform: button.getAttribute("data-value")
+        });
+      });
+    });
+
+    if (retryButton) {
+      retryButton.addEventListener("click", function () {
+        var controller = getController();
+
+        if (controller && typeof controller.retryHandoff === "function") {
+          controller.retryHandoff();
+        }
+      });
+    }
+  }
+
   function bindDesktopDrag() {
     var dragHandle = document.getElementById("desktop-drag-handle");
 
@@ -164,16 +248,34 @@
 
   function describeHandoff(state) {
     var t = window.bgmsI18n.translate;
+    var settings = window.bgmsSettings.read();
 
-    if (state.summarySent) {
+    if (!settings.handoffEnabled) {
+      return t("handoffOff");
+    }
+
+    if (!settings.playerName) {
+      return t("handoffNeedsNickname");
+    }
+
+    if (state.handoffPending > 0) {
+      return t("handoffPending") + " " + String(state.handoffPending)
+        + (state.handoffLastError ? " (" + state.handoffLastError + ")" : "");
+    }
+
+    if (state.handoffOutcome === "sent") {
       return t("handoffSent");
     }
 
-    if (state.summaryReady) {
-      return t("handoffReady");
+    if (state.handoffOutcome === "rejected") {
+      return t("handoffRejected");
     }
 
-    return t("handoffDisabled");
+    if (state.handoffOutcome === "dropped") {
+      return t("handoffFailed");
+    }
+
+    return t("handoffIdle");
   }
 
   function setText(id, text) {
@@ -229,6 +331,7 @@
     setText("desktop-gep-error", state.gepErrorReason || "--");
     setText("desktop-handoff", describeHandoff(state));
     setText("desktop-required-result", state.lastRequiredFeaturesResult || "--");
+    setText("handoff-status", describeHandoff(state));
   }
 
   function bindRefreshButton() {
@@ -268,17 +371,33 @@
   window.bgmsI18n.applyTranslations(document);
   bindLanguageButtons();
   bindSettingsControls();
+  bindServiceSettingsControls();
   bindDesktopDrag();
   bindDesktopClose();
   bindRefreshButton();
   syncLanguageButtons();
   syncSettingsControls();
+  syncServiceSettingsControls();
   subscribeDiagnostics();
 
   window.addEventListener("bgms:language-change", function () {
     window.bgmsI18n.applyTranslations(document);
     syncLanguageButtons();
     syncSettingsControls();
+    syncServiceSettingsControls();
     renderDiagnostics(lastDiagnosticsState);
+  });
+
+  // 다른 창이나 시나리오 코드가 설정을 바꿀 때도 컨트롤 상태를 맞춘다.
+  window.addEventListener("bgms:service-settings-change", function () {
+    syncServiceSettingsControls();
+    renderDiagnostics(lastDiagnosticsState);
+  });
+
+  window.addEventListener("storage", function (event) {
+    if (event.key === window.bgmsSettings.STORAGE_KEY) {
+      syncServiceSettingsControls();
+      renderDiagnostics(lastDiagnosticsState);
+    }
   });
 })();

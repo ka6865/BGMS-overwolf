@@ -120,7 +120,8 @@ body {
 
 .desktop-hero {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
+  /* 로고가 없는 컨텍스트(개발 하네스)에서도 본문이 좁은 컬럼에 갇히지 않게 auto를 쓴다. */
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 24px;
   align-items: center;
   padding-bottom: 36px;
@@ -171,9 +172,14 @@ h1 {
 
 .settings-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   margin-top: 28px;
+}
+
+/* 진단 패널은 항목이 많아 설정 그리드 전체 폭을 차지한다. */
+.diagnostics-panel {
+  grid-column: 1 / -1;
 }
 
 .panel {
@@ -214,6 +220,57 @@ h1 {
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.panel-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.control-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  accent-color: var(--mint);
+  cursor: pointer;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+input[type="text"]:focus-visible {
+  border-color: rgba(94, 227, 161, 0.55);
+  outline: none;
+}
+
+.handoff-status {
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .segmented-control {
@@ -362,6 +419,12 @@ input[type="range"] {
 /* GEP 장애/부분 장애를 사용자에게 알리는 경고 라인 */
 .mini-warning {
   color: #f6c667;
+}
+
+/* 전송 대기 중인 세션 요약 건수. 대기 항목이 없으면 숨긴다. */
+.mini-note {
+  flex: none;
+  color: var(--mint);
 }
 
 .text-button {
