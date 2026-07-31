@@ -186,6 +186,17 @@ state 코드:
 - info key `pseudo_match_id`(category `match_info`)
 - `match_id`와 `pseudo_match_id`를 모두 보존하고 `match_id || pseudo_match_id`를 `effectiveMatchId`로 사용한다.
 
+### match_id 와 공식 API 연결 가능성 (2026-08-01 공식 문서 재확인)
+
+공식 PUBG GEP 문서의 `match` feature 표 기준이다.
+
+- `match_id` 예시값: `match.bro.official.pc-2018-03.steam.solo.eu.2019.05.07.08.ce8d1a14-b2af-41c8-8bf4-d2a504326630`. 문서는 이 값을 "Can be compared and checked at this link"라고 설명한다. 즉 **공식 PUBG API match id 와 같은 체계다.**
+- `pseudo_match_id` 예시값: `0c0ea3df-97ea-4d3a-b1f6-f8e34042251f`. 문서가 "Overwolf-generated code which is unrelated to the match ID given above"라고 명시한다. **공식 API 조회 키로 쓸 수 없다.**
+
+따라서 사후 분석 연결은 `match_id`가 있을 때만 성립하고, `pseudo_match_id`는 세션 식별용 대체값으로만 쓴다. `effectiveMatchId`가 `pseudo_match_id`로 채워진 경우를 공식 API 조회에 넘기지 않도록 구분이 필요하다.
+
+실게임에서 확인할 것: 현재 PUBG 세션에서 `match_id`가 실제로 emit 되는지, 그리고 그 값이 공식 API `matches/{id}` 응답과 일치하는지. 문서상 `match_id`는 GEP 120.0부터이고 `pseudo_match_id`는 130.0.15부터다.
+
 ### `gep_internal` (구독하지 않음)
 
 - 공식 payload: `{"info":{"gep_internal":{"version_info":"{\"local_version\":\"157.0.1\",\"public_version\":\"157.0.1\",\"is_updated\":true}"}},"feature":"gep_internal"}`

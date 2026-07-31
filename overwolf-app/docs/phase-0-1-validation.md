@@ -42,6 +42,7 @@ To point the harness at a local BGMS server instead of the interceptor, set `win
   - `roster`
   - `me`
 - Confirm whether `match_id`, `pseudo_match_id`, or both are emitted for current PUBG sessions.
+- If `match_id` is emitted, confirm the value resolves against the official PUBG API (`matches/{id}`). The GEP docs describe `match_id` as comparable to the official match ID, while `pseudo_match_id` is an Overwolf-generated code that is explicitly unrelated. Post-match linking depends on `match_id`, so record which one actually arrives.
 - Confirm the `roster_XX` item shape and the `out` field type.
 - Confirm whether roster removal is emitted as an empty/null value for a `roster_XX` key.
 - Confirm whether `knockedout` (present in the status endpoint but not in the PUBG feature table) is actually emitted.

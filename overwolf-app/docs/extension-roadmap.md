@@ -57,6 +57,24 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 - **Statsly의 무료 광고형 모델**: PUBG API 약관 Exclusive Access 금지 조항 때문에 데이터 기능을 유료로 잠글 수 없다. 광고 제거만 유료로 두는 구조가 정책과 자연스럽게 맞는다. Phase 7 방향과 일치한다.
 - **Outplayed의 자동 하이라이트**: Phase 3 `media.replays` 항목과 동일하다. `VideoCaptureSettings` 권한, 저장 용량, 사용자 동의 검증이 선행 조건이다.
 
+### 권고 방향과 근거 (2026-08-01)
+
+**핵심 근거**: 공식 GEP 문서 확인 결과 `match_id`가 공식 PUBG API match id 와 같은 체계다(`match.bro.official.pc-...` 형식, 문서에 "Can be compared and checked at this link"). 즉 GEP 세션을 공식 API 매치와 연결할 수 있다. 반면 `pseudo_match_id`는 Overwolf 생성값이라 조회 키로 쓸 수 없다. 자세한 내용은 `official-api-notes.md` 참조.
+
+이 사실이 방향을 결정한다. BGMS는 이미 공식 API 텔레메트리 기반 맵 분석 자산을 갖고 있고, GEP는 그 분석을 **어느 매치에 대해 언제 시작할지 알려주는 트리거**로서 가치가 있다. 실시간 표시 경쟁에 뛰어들 필요가 없다.
+
+권고하는 우선순위:
+
+1. **Phase 1.5 오버레이 재편** — 새 권한 없이 가능하고, 스토어 제출 전에 끝내야 한다(표시 항목이 listing 문구와 스크린샷을 결정한다). 배그 HUD 중복을 덜어내고 `headshots`/`max_kill_distance` 같은 게임이 안 보여주는 값으로 채운다.
+2. **Phase 2 웹 연결 화면** — 출시 가치의 최소 조건. `match_id`로 공식 API 매치와 연결해 BGMS 맵 분석으로 진입하는 경로를 만든다. 이 경로가 경쟁 앱과의 유일한 실질 차별점이다.
+3. **Phase 3 사후 사망 리뷰** — `death`/`killer` 타임스탬프를 요약에 남기고 사후에 맵 위에서 보여준다. 권한 불필요.
+
+피해야 할 방향:
+
+- 실시간 표시 항목을 늘려 경쟁하는 것. 배그 HUD와 중복되거나 정책 금지 영역에 접근한다.
+- 세션 요약을 숫자 나열로만 보여주는 것. Statsly와 Match Bar가 이미 하는 일이며 차별점이 없다.
+- 웹 연결 없이 스토어에 제출하는 것. "보냈는데 볼 곳이 없는" 상태로는 앱을 켤 이유를 설명할 수 없다.
+
 ## 공식 문서 기준 기능 지도
 
 아래 기능 지도는 Overwolf 공식 API Reference의 전체 카테고리를 기준으로 BGMS 적합도를 분류한 것이다.
@@ -106,7 +124,7 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 | `killer` | 로컬 플레이어를 죽인 killer nickname | 허용 | Phase 1 | 신뢰도 높은 분석 근거로 사용하지 않음 |
 | `match` | mode, match_id, matchStart, matchEnd | 허용 | Phase 1 | matchEnd 중복 수신 idempotent 필요 |
 | `match_info` | pseudo_match_id | 허용 | Phase 1 | `match_id`와 `pseudo_match_id` 모두 안전 처리 |
-| `rank` | 종료 시 순위/총원 | 후보 (우선순위 상향) | Phase 2 | info key가 `match_info.me`로 `me` feature와 겹치므로 feature 기준 분기 필수. 사후 요약의 핵심 지표이며 게임 결과 화면을 놓친 경우 가치가 있다 |
+| `rank` | 종료 시 순위(`me`)와 총원(`total`), 둘 다 category `match_info`, 문자열 값 (예: `"38"`, `"98"`) | 후보 (우선순위 상향) | Phase 2 | info key가 `match_info.me`로 `me` feature와 겹치므로 feature 기준 분기 필수. 사후 요약의 핵심 지표이며 게임 결과 화면을 놓친 경우 가치가 있다. 값이 문자열이므로 숫자 변환 필요 |
 | `counters` | ping 등 성능 카운터 | 후보 | Phase 4 | 성능 HUD 후보, 핵심 분석과 분리 |
 | `location` | 로컬 좌표 | 금지 | Phase 3+ 별도 승인 | Phase 0~1에서 실시간 미니맵/좌표 처리 금지 |
 | `me` | health, weaponState, stance, view, movement 등 로컬 상태 | health(ko_health 포함)/weaponState만 허용 | Phase 1 | 추가 상태 표시 확대는 HUD 복잡도와 심사 리스크 검토. health/weaponState는 게임 HUD와 중복이므로 Phase 1.5에서 표시 축소 검토. `ko_health` 기반 KO 표시는 게임 표현과 달라 판단 보류 |
@@ -192,7 +210,7 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 
 - 세션 요약 목록과 상세 화면. `overwolf_session_events`를 읽는 경로가 웹에 아직 하나도 없다
 - 오버레이 또는 데스크탑 창에서 해당 화면으로 나가는 링크. `utils.openUrlInDefaultBrowser` 사용 후보이며 현재 앱에는 외부 링크가 없다
-- 세션 요약과 공식 API 매치를 `match_id`로 연결. GEP `match_id`가 공식 API match id와 동일한 형식인지 실게임에서 확인이 필요하다
+- 세션 요약과 공식 API 매치를 `match_id`로 연결. 공식 문서 확인 결과 GEP `match_id`는 공식 API match id 와 같은 체계이므로 연결이 성립한다. 단 `pseudo_match_id`는 Overwolf 생성값이라 조회 키로 쓸 수 없으므로, `effectiveMatchId`가 `pseudo_match_id`로 채워진 경우를 공식 API 조회에 넘기지 않도록 구분해야 한다. 실게임에서 `match_id` 실제 emit 여부 확인이 남아 있다
 
 그다음:
 
