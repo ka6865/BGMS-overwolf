@@ -305,6 +305,19 @@ desktop 진단을 기준으로 판단한다.
 
 manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트의 CEF에서 동작이 보장되지 않는 최신 선택자는 쓰지 않는다. 진단 패널에서 `:has()`를 쓰려다 명시적 클래스(`.diagnostic-span`)로 바꿨다.
 
+## overwolf.settings.hotkeys (2026-08-01 확인)
+
+`Hotkeys` 권한으로 사용 가능하다. 기존에는 `onPressed` 만 썼다.
+
+- `get(callback)`: 할당된 핫키를 반환한다. 응답의 `games` 는 **class id 문자열 키에 `IHotkey` 배열**을 담는다. PUBG 는 `"10906"` 이다. 게임에 묶이지 않은 핫키는 `globals` 에 온다.
+- `IHotkey` 는 `name`(manifest 의 핫키 키), `binding`(표시용 조합 문자열), `IsUnassigned` 를 가진다.
+- `onChanged`: 사용자가 Overwolf 설정에서 조합을 바꿀 때 발생한다. 공식 문서가 변경 시 사용자에게 알리라고 권한다.
+- `onHold`: manifest 에서 `hold` 로 선언한 핫키만 발생한다. 우리는 쓰지 않는다.
+
+**중요**: manifest 의 `default` 값을 UI 에 하드코딩하면 안 된다. 사용자가 조합을 바꾸면 앱이 잘못된 안내를 하게 된다. 반드시 `get` 으로 실제 값을 읽는다.
+
+조합 변경은 앱 안에서 직접 할 수 없다. `overwolf://settings/hotkeys` 를 열어 Overwolf 설정 화면으로 보내는 것이 공식 경로다. `overwolf.utils.openUrlInDefaultBrowser` 로 이 스킴을 열 수 있다.
+
 ## 데스크탑 창을 서브모니터로 옮기기 (2026-08-01)
 
 이전 manifest에서 `desktop` 창에 `desktop_only`가 없었다. 공식 Manifest 문서 기준으로 `in_game_only`와 `desktop_only`가 모두 없으면 그 창은 두 컨텍스트에 걸쳐 쓰이고, 게임 실행 중에는 오버레이 컨텍스트로 주입되어 게임 화면에 묶인다. 그래서 보조 모니터로 빼기 어려웠다.

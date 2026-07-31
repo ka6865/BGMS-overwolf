@@ -130,7 +130,20 @@
     },
     settings: {
       hotkeys: {
-        onPressed: createListenerHub(hotkeyListeners)
+        onPressed: createListenerHub(hotkeyListeners),
+        // 공식 응답 형태: games 는 class id 키에 IHotkey 배열을 담는다.
+        get: function (callback) {
+          callback({
+            success: true,
+            games: {
+              "10906": [
+                { name: "toggle_overlay", binding: "Ctrl+Shift+B", IsUnassigned: false },
+                { name: "open_desktop", binding: "Alt+G", IsUnassigned: false }
+              ]
+            },
+            globals: []
+          });
+        }
       },
       language: {
         get: function (callback) {

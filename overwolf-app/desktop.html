@@ -67,6 +67,21 @@
           <h2 data-i18n="settingsTitle">Overlay settings</h2>
 
           <div class="control-group">
+            <span class="control-label" data-i18n="hotkeyLabel">Hotkeys</span>
+            <dl class="hotkey-list">
+              <div>
+                <dt data-i18n="hotkeyToggleOverlay">Show or hide overlay</dt>
+                <dd id="hotkey-toggle-overlay">--</dd>
+              </div>
+              <div>
+                <dt data-i18n="hotkeyOpenDesktop">Open this window</dt>
+                <dd id="hotkey-open-desktop">--</dd>
+              </div>
+            </dl>
+            <button type="button" id="edit-hotkeys" class="text-button" data-i18n="editHotkeys">Change in Overwolf settings</button>
+          </div>
+
+          <div class="control-group">
             <span class="control-label" data-i18n="overlayModeLabel">Overlay mode</span>
             <div class="segmented-control" role="group" aria-label="Overlay mode">
               <button type="button" data-setting="mode" data-value="mini" data-i18n="overlayModeMini">Mini</button>

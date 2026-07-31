@@ -57,6 +57,47 @@ Overwolf PUBG 카테고리에는 18개가 걸려 있지만 Hone(FPS 최적화), 
 - **Statsly의 무료 광고형 모델**: PUBG API 약관 Exclusive Access 금지 조항 때문에 데이터 기능을 유료로 잠글 수 없다. 광고 제거만 유료로 두는 구조가 정책과 자연스럽게 맞는다. Phase 7 방향과 일치한다.
 - **Outplayed의 자동 하이라이트**: Phase 3 `media.replays` 항목과 동일하다. `VideoCaptureSettings` 권한, 저장 용량, 사용자 동의 검증이 선행 조건이다.
 
+### 공식 Best Practices 재점검 (2026-08-01)
+
+공식 문서 `guides/general-product/best-practices` 의 목차를 항목별로 대조했다. API 카테고리 지도와 달리 이 문서는 제품 관점 요구사항이라 별도 점검이 필요했다.
+
+| 항목 | 현재 상태 | 판단 |
+| --- | --- | --- |
+| Hotkeys ("앱 설정에서 조합을 확인/변경할 수 있게") | **미충족이었다 → 2026-08-01 구현** | 데스크탑 창에 실제 할당된 조합을 표시하고 Overwolf 설정으로 보내는 버튼을 추가했다 |
+| Tooltips | 충족 | 닫기 버튼, 아이콘 버튼, 미수신 라벨에 `title` 이 있다 |
+| Window controls | 충족 | 드래그 이동, 닫기, 위치/크기 기억 |
+| In and Out-of-game behavior | 충족 | 데스크탑 창과 인게임 오버레이가 분리되어 있고 각각 다른 역할을 한다 |
+| Error notifications | 충족 | `isServiceDegraded` 기반 경고 라인과 진단 자동 펼침 |
+| App look'n'feel | 충족 | BGMS 웹과 같은 다크 테마, 일관된 컴포넌트 |
+| Analytics | 미도입 | 사용자 동의와 개인정보 범위를 먼저 정해야 한다. Phase 4 검토 |
+| Ad container placeholder | 미도입 | Phase 7 수익화 항목. 광고 도입 결정 전에는 자리만 비워둔다 |
+| App's size | 충족 | 패키지 76KB |
+| FTUE (첫 사용자 경험) | **미충족** | 아래 참조 |
+| App support page | **미충족** | 아래 참조 |
+| Ask for feedback | **미충족** | 아래 참조 |
+| Discord server | 부분 충족 | BGMS Discord 는 있지만 앱 안에 링크가 없다 |
+
+#### 2026-08-01 구현: 핫키 안내
+
+공식 문서가 "앱 설정 패널에서 핫키 조합을 확인하고 바꿀 수 있게 하라" 고 명시한다. 기존에는 `Ctrl+Shift+B` 를 사용자가 알 방법이 앱 안에 전혀 없었다.
+
+- `overwolf.settings.hotkeys.get` 으로 **실제 할당된 조합**을 읽어 표시한다. manifest 의 `default` 를 그대로 쓰면 사용자가 Overwolf 설정에서 바꿨을 때 잘못된 안내를 하게 된다
+- 응답의 `games` 는 class id 별 배열이므로 PUBG(10906) 항목을 우선 보고, 없으면 전체를 훑는다
+- 조합 변경은 앱 안에서 직접 할 수 없다. `overwolf://settings/hotkeys` 로 Overwolf 설정 화면을 여는 것이 공식 경로다
+- `Hotkeys` 권한으로 이미 가능해 manifest 권한이 늘지 않았다
+
+#### 남은 미충족 항목 (Phase 4 후보)
+
+- **FTUE**: 설치 직후 첫 화면이 설정 패널이다. 공식 문서는 "앱이 무엇을 하고 다음에 무엇을 해야 하는지" 안내하는 화면을 권한다. 현재는 전송을 켜고 닉네임을 넣어야 가치가 생기는데 그 안내가 없다
+- **지원 페이지**: FAQ, 트러블슈팅, 변경 이력을 담은 페이지가 필요하고 앱 안에 눈에 띄는 링크를 둬야 한다. `bgms.kr` 아래에 만드는 것이 자연스럽다
+- **피드백 경로**: 공식 문서가 in-app 링크를 권하고, 리뷰와 피드백이 늘어난다는 사례를 든다. BGMS Discord 링크를 데스크탑 창에 두는 것이 가장 적은 비용이다
+
+### Statsly 재관찰: 세션 단위 집계 (2026-08-01 구현)
+
+Statsly 가 매치 히스토리를 세션 단위로 묶어 보여준다. 매치를 하나씩만 나열하면 "오늘 어땠는지" 를 알 수 없다는 점이 우리 화면에도 그대로 있었다.
+
+`groupByPlaySession` 을 추가해 매치 사이 간격이 90분을 넘으면 다른 플레이 세션으로 끊고, 묶음마다 시간 범위, 판수, 누적 처치/헤드샷, 최고 순위, 평균 순위를 머리글에 표시한다. 순위를 받지 못한 매치는 평균에서 제외한다.
+
 ### 권고 방향과 근거 (2026-08-01)
 
 **핵심 근거**: 공식 GEP 문서 확인 결과 `match_id`가 공식 PUBG API match id 와 같은 체계다(`match.bro.official.pc-...` 형식, 문서에 "Can be compared and checked at this link"). 즉 GEP 세션을 공식 API 매치와 연결할 수 있다. 반면 `pseudo_match_id`는 Overwolf 생성값이라 조회 키로 쓸 수 없다. 자세한 내용은 `official-api-notes.md` 참조.

@@ -394,6 +394,40 @@ input[type="range"] {
   margin-top: 14px;
 }
 
+/*
+ * 핫키 안내. 사용자가 Overwolf 설정에서 조합을 바꿀 수 있으므로
+ * manifest 기본값이 아니라 실제 할당값을 표시한다.
+ */
+.hotkey-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.hotkey-list div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hotkey-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hotkey-list dd {
+  margin: 0;
+  padding: 2px 7px;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .diagnostics-list {
   display: grid;
   /* 진단 항목이 14개라 1열로 쌓으면 기본 창 높이(700px)를 혼자 넘긴다.

@@ -719,6 +719,58 @@
     getState: cloneState,
     subscribe: subscribe,
     /*
+     * 현재 할당된 핫키 조합을 읽는다.
+     * manifest 의 default 값이 아니라 사용자가 바꾼 실제 값을 보여주기 위해
+     * overwolf.settings.hotkeys.get 을 쓴다. Hotkeys 권한으로 이미 가능하다.
+     */
+    getAssignedHotkeys: function (callback) {
+      if (!hasBaseOverwolfApi() || !overwolf.settings || !overwolf.settings.hotkeys
+        || !overwolf.settings.hotkeys.get) {
+        callback(null);
+        return;
+      }
+
+      overwolf.settings.hotkeys.get(function (result) {
+        var assigned = {};
+        var list;
+
+        if (!result || !result.success || !result.games) {
+          callback(null);
+          return;
+        }
+
+        // games 는 class id 별 배열이다. PUBG(10906) 항목을 우선 보고, 없으면 전체를 훑는다.
+        list = result.games[String(gepState.PUBG_CLASS_IDS[0])] || [];
+
+        if (!list.length) {
+          Object.keys(result.games).forEach(function (key) {
+            list = list.concat(result.games[key] || []);
+          });
+        }
+
+        list.forEach(function (hotkey) {
+          if (hotkey && hotkey.name) {
+            assigned[hotkey.name] = hotkey.binding || "";
+          }
+        });
+
+        callback(assigned);
+      });
+    },
+    /*
+     * Overwolf 핫키 설정 화면을 연다.
+     * 앱 안에서 조합을 직접 바꾸는 API 는 없고, 공식 권고는 설정 화면으로 보내는 것이다.
+     */
+    openHotkeySettings: function () {
+      if (!hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
+        return false;
+      }
+
+      overwolf.utils.openUrlInDefaultBrowser("overwolf://settings/hotkeys");
+
+      return true;
+    },
+    /*
      * BGMS 웹의 세션 기록 화면을 기본 브라우저로 연다.
      * 사용자가 앱에 입력한 닉네임/플랫폼을 쿼리로 붙여 바로 자기 기록이 보이게 한다.
      * overwolf.utils.openUrlInDefaultBrowser 는 별도 permission 을 요구하지 않는다.

@@ -415,3 +415,28 @@ test("openSessionHistory: BGMS 세션 경로 외의 도메인은 열지 않는�
     assert.equal(opened.indexOf("https://bgms.kr/"), 0);
   });
 });
+
+test("getAssignedHotkeys: manifest 기본값이 아니라 실제 할당된 조합을 읽는다", () => {
+  const sandbox = createSandbox();
+  let received = null;
+
+  sandbox.bgmsController.getAssignedHotkeys((assigned) => {
+    received = assigned;
+  });
+
+  assert.ok(received, "핫키 조회 결과가 있어야 한다");
+  assert.equal(received.toggle_overlay, "Ctrl+Shift+B");
+  // 사용자가 바꾼 값(Alt+G)이 manifest 기본값(Ctrl+Shift+G)보다 우선한다.
+  assert.equal(received.open_desktop, "Alt+G");
+});
+
+test("openHotkeySettings: Overwolf 핫키 설정 화면을 연다", () => {
+  const sandbox = createSandbox();
+
+  const opened = sandbox.bgmsController.openHotkeySettings();
+  const urls = sandbox.mockGep.openedUrls();
+
+  assert.equal(opened, true);
+  assert.equal(urls.length, 1);
+  assert.equal(urls[0], "overwolf://settings/hotkeys");
+});

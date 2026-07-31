@@ -395,6 +395,46 @@
     }
   }
 
+  /*
+   * 현재 할당된 핫키 조합을 표시한다.
+   * manifest 의 default 를 그대로 쓰지 않는 이유는 사용자가 Overwolf 설정에서
+   * 조합을 바꿀 수 있고, 그 경우 앱이 잘못된 안내를 하게 되기 때문이다.
+   */
+  function syncHotkeyDisplay() {
+    var controller = getController();
+    var fallback = { toggle_overlay: "Ctrl+Shift+B", open_desktop: "Ctrl+Shift+G" };
+
+    function render(assigned) {
+      var values = assigned || fallback;
+
+      setText("hotkey-toggle-overlay", values.toggle_overlay || fallback.toggle_overlay);
+      setText("hotkey-open-desktop", values.open_desktop || fallback.open_desktop);
+    }
+
+    if (!controller || typeof controller.getAssignedHotkeys !== "function") {
+      render(null);
+      return;
+    }
+
+    controller.getAssignedHotkeys(render);
+  }
+
+  function bindHotkeyControls() {
+    var editButton = document.getElementById("edit-hotkeys");
+
+    if (!editButton) {
+      return;
+    }
+
+    editButton.addEventListener("click", function () {
+      var controller = getController();
+
+      if (controller && typeof controller.openHotkeySettings === "function") {
+        controller.openHotkeySettings();
+      }
+    });
+  }
+
   function bindRefreshButton() {
     var refreshButton = document.getElementById("desktop-refresh");
 
@@ -436,10 +476,12 @@
   bindDesktopDrag();
   bindDesktopClose();
   bindRefreshButton();
+  bindHotkeyControls();
   syncLanguageButtons();
   syncSettingsControls();
   syncServiceSettingsControls();
   subscribeDiagnostics();
+  syncHotkeyDisplay();
 
   window.addEventListener("bgms:language-change", function () {
     window.bgmsI18n.applyTranslations(document);
