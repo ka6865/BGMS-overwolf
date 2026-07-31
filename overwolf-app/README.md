@@ -10,6 +10,7 @@ Done and verified:
 - `overwolf_session_events` and `overwolf_session_quota` exist in the production database with RLS on and `anon` grants revoked.
 - `event_timeline` column and the read RPCs (`list_overwolf_sessions`, `get_overwolf_session`) are applied to the production database. All five Overwolf functions grant EXECUTE to `service_role` only; the old nine-argument insert signature was dropped.
 - The read route and the web session view are deployed. Smoke-tested against `https://bgms.kr`: a full timeline payload stores and re-sends as a duplicate, a `damage_dealt` entry inside the timeline returns 422, a `location` entry is silently dropped, the list returns the normalized view with a sorted timeline, and the response leaks no `source_host` or `is_internal`. A session with only `pseudo_match_id` renders without an analysis link. Test rows were deleted afterwards.
+- Map replay entry is deployed and verified in production. Opening a session's `7:00` engagement lands the replay at slider `420000`ms of `1667712`ms, showing `ELAPSED 07:00`, `ALIVE 69`, and the shrinking blue zone. The UUID is extracted from the GEP `match_id`, so no new data source was needed.
 - The page renders at 1280 and 390 px with no horizontal overflow.
 - 90-day retention is wired into the daily cleanup job in the BGMS repository.
 - 66 app tests, 43 server tests, 8 migration DB scenarios pass.
