@@ -402,6 +402,41 @@ input[type="range"] {
  * 지원/피드백 링크. 공식 Best Practices 가 in-app 피드백 경로를 권한다.
  * 앱 안에서 웹을 렌더링하지 않고 기본 브라우저로 연다.
  */
+/*
+ * 첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
+ * 설정이 갖춰지면 desktop.js 가 숨기므로 상시 노출되는 설명 영역이 아니다.
+ */
+.onboarding {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(94, 227, 161, 0.28);
+  border-radius: 8px;
+  background: rgba(94, 227, 161, 0.06);
+}
+
+.onboarding h2 {
+  margin-bottom: 12px;
+  color: var(--mint);
+  font-size: 14px;
+}
+
+.onboarding-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.onboarding-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .desktop-footer {
   display: flex;
   flex-wrap: wrap;

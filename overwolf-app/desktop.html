@@ -31,6 +31,25 @@
         </div>
       </section>
 
+      <!--
+        첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
+        전송을 켜고 닉네임을 넣으면 desktop.js 가 이 영역을 숨긴다.
+      -->
+      <section class="onboarding is-hidden" id="onboarding" aria-labelledby="onboarding-title">
+        <h2 id="onboarding-title" data-i18n="onboardingTitle">Two steps to get started</h2>
+        <ol class="onboarding-steps">
+          <li>
+            <span class="onboarding-step" id="onboarding-step-1" data-i18n="onboardingStepConsent">Turn on session handoff below and enter your PUBG nickname.</span>
+          </li>
+          <li>
+            <span class="onboarding-step" data-i18n="onboardingStepPlay">Play a match. When it ends, the summary travels to BGMS on its own.</span>
+          </li>
+        </ol>
+        <p class="onboarding-note" data-i18n="onboardingNote">
+          Nothing is sent until you turn it on. The overlay works either way, and you can open it in a match with the hotkey listed under overlay settings.
+        </p>
+      </section>
+
       <section class="settings-grid" aria-label="Overlay settings">
         <article class="panel handoff-panel">
           <h2 data-i18n="handoffTitle">BGMS session handoff</h2>

@@ -132,6 +132,9 @@
       button.classList.toggle("is-selected", isSelected);
       button.setAttribute("aria-pressed", isSelected ? "true" : "false");
     });
+
+    // 설정이 갖춰지면 첫 실행 안내를 감춘다.
+    syncOnboarding();
   }
 
   function saveServiceSettings(partial) {
@@ -417,6 +420,29 @@
     }
 
     controller.getAssignedHotkeys(render);
+  }
+
+  /*
+   * 첫 실행 안내(FTUE)를 표시할지 결정한다.
+   * 전송 동의와 닉네임이 모두 갖춰지면(=설정을 마쳤으면) 숨긴다.
+   * 별도 "다시 보지 않기" 플래그를 두지 않는 이유는, 설정을 되돌린 사용자에게
+   * 다시 안내가 필요하기 때문이다.
+   */
+  function syncOnboarding() {
+    var section = document.getElementById("onboarding");
+    var settings = window.bgmsSettings.read();
+    var configured = window.bgmsSettings.canSendHandoff(settings);
+
+    if (!section) {
+      return;
+    }
+
+    section.classList.toggle("is-hidden", configured);
+
+    // 1단계 문구는 남은 작업에 따라 바꿔준다.
+    setText("onboarding-step-1", settings.handoffEnabled
+      ? window.bgmsI18n.translate("onboardingStepNickname")
+      : window.bgmsI18n.translate("onboardingStepConsent"));
   }
 
   /* 지원/피드백 링크. 컨트롤러의 화이트리스트 키만 넘긴다. */
