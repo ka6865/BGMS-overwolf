@@ -9,6 +9,7 @@
   --mint: #5ee3a1;
   --amber: #f3bd4e;
   --red: #ef6461;
+  --overlay-opacity: 1;
 }
 
 * {
@@ -38,29 +39,106 @@ body {
 }
 
 .desktop-page {
-  width: min(920px, calc(100vw - 48px));
+  /* 서브모니터로 옮겨 크게 띄웠을 때 양옆이 비지 않도록 상한을 넓게 둔다.
+     좁은 창에서는 여백만 확보한다. */
+  width: min(1280px, calc(100vw - 48px));
   margin: 0 auto;
-  padding: 52px 0;
+  padding: 16px 0 28px;
+}
+
+.desktop-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border: 1px solid rgba(165, 197, 181, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--muted);
+  cursor: move;
+  font-size: 12px;
+  font-weight: 800;
+  user-select: none;
+}
+
+.desktop-titlebar span:first-child {
+  color: var(--mint);
+}
+
+.desktop-titlebar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.desktop-titlebar-actions button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.desktop-titlebar-actions button:hover {
+  border-color: rgba(94, 227, 161, 0.55);
+  color: var(--mint);
+}
+
+.language-switcher {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: default;
+}
+
+.language-switcher button {
+  min-width: 62px;
+  padding: 5px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.language-switcher button.is-selected {
+  border-color: rgba(94, 227, 161, 0.55);
+  background: rgba(94, 227, 161, 0.13);
+  color: var(--mint);
 }
 
 .desktop-hero {
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 24px;
+  /* 로고가 없는 컨텍스트(개발 하네스)에서도 본문이 좁은 컬럼에 갇히지 않게 auto를 쓴다. */
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 18px;
   align-items: center;
-  padding-bottom: 36px;
+  padding-bottom: 20px;
   border-bottom: 1px solid var(--line);
 }
 
 .desktop-logo {
-  width: 92px;
-  height: 92px;
+  width: 56px;
+  height: 56px;
 }
 
 .eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 4px;
   color: var(--mint);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
   text-transform: uppercase;
@@ -72,10 +150,14 @@ p {
   margin-top: 0;
 }
 
+/*
+ * 이 창은 마케팅 페이지가 아니라 설정과 진단을 보는 유틸리티 창이다.
+ * 44px 히어로 타이포는 700px 창에서 본문을 밀어내므로 패널 헤딩 규모로 맞춘다.
+ */
 h1 {
-  margin-bottom: 12px;
-  font-size: 44px;
-  line-height: 1.05;
+  margin-bottom: 6px;
+  font-size: 22px;
+  line-height: 1.25;
   letter-spacing: 0;
 }
 
@@ -83,37 +165,387 @@ h1 {
   max-width: 680px;
   margin-bottom: 0;
   color: var(--muted);
-  font-size: 17px;
-  line-height: 1.55;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .desktop-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 폭이 넉넉하면 정책 카드 2장을 나란히, 좁으면 한 장씩 쌓는다. */
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 16px;
-  margin-top: 28px;
+  margin-top: 16px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+  /* 두 패널이 서로의 높이를 따라가며 빈 공간을 만들지 않게 한다. */
+  align-items: start;
+}
+
+/*
+ * 진단 패널은 항목이 많아 넓은 폭이 유리하다.
+ * 값이 긴 항목이 많아 한 칸으로 좁히면 잘리므로 항상 전체 폭을 쓴다.
+ */
+.diagnostics-panel {
+  grid-column: 1 / -1;
 }
 
 .panel {
-  min-height: 220px;
-  padding: 22px;
+  padding: 18px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
 }
 
 .panel h2 {
-  margin-bottom: 16px;
-  font-size: 18px;
+  margin-bottom: 12px;
+  font-size: 15px;
 }
 
 .scope-list {
   display: grid;
-  gap: 12px;
+  gap: 7px;
   margin: 0;
-  padding-left: 18px;
+  padding-left: 16px;
   color: var(--muted);
+  font-size: 12px;
   line-height: 1.45;
+}
+
+.control-group {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.control-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+/* range 값 표시. 라벨과 같은 줄 오른쪽에 붙는다. */
+.control-label output {
+  color: var(--mint);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* 토글 행의 라벨은 텍스트 한 줄이므로 자기 폭만 쓰게 한다. */
+.control-row .control-label {
+  flex: 1 1 auto;
+  display: block;
+}
+
+.control-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  accent-color: var(--mint);
+  cursor: pointer;
+}
+
+/* 체크박스 자체는 작아도 라벨 전체가 클릭 대상이 되도록 행에 커서를 준다. */
+label.control-row {
+  cursor: pointer;
+  padding: 4px 0;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+input[type="text"]:focus-visible {
+  border-color: rgba(94, 227, 161, 0.55);
+  outline: none;
+}
+
+.handoff-status {
+  margin: 14px 0 0;
+  /* 입력 필드처럼 보이지 않게 테두리 대신 왼쪽 강조선만 쓴다. */
+  padding: 2px 0 2px 10px;
+  border: 0;
+  border-left: 2px solid rgba(94, 227, 161, 0.45);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* 표시할 상태 문구가 없으면 빈 강조선만 남으므로 감춘다. */
+.handoff-status:empty {
+  display: none;
+}
+
+.segmented-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.segmented-control button {
+  min-width: 88px;
+  padding: 9px 12px;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.segmented-control button.is-selected {
+  border-color: rgba(94, 227, 161, 0.55);
+  background: rgba(94, 227, 161, 0.13);
+  color: var(--mint);
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--mint);
+}
+
+/*
+ * 진단은 개발/문제 해결용이라 기본 접힘이다.
+ * 서비스 경고나 GEP 오류가 있을 때 desktop.js 가 자동으로 펼친다.
+ */
+.diagnostics-disclosure summary {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.diagnostics-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+/* 접힘/펼침 방향을 나타내는 삼각형을 직접 그린다. */
+.diagnostics-disclosure summary::before {
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid var(--muted);
+  content: "";
+  transform: translateY(-1px);
+}
+
+.diagnostics-disclosure[open] summary::before {
+  border-top: 5px solid var(--muted);
+  border-right: 4px solid transparent;
+  border-bottom: 0;
+  border-left: 4px solid transparent;
+}
+
+.diagnostics-disclosure summary h2 {
+  margin: 0;
+}
+
+.diagnostics-disclosure summary:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 3px;
+}
+
+.diagnostics-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 문제가 감지되면 힌트를 경고색으로 바꿔 펼칠 이유를 알린다. */
+.diagnostics-hint.is-warning {
+  color: var(--amber);
+}
+
+.diagnostics-disclosure[open] .diagnostics-list {
+  margin-top: 14px;
+}
+
+/*
+ * 핫키 안내. 사용자가 Overwolf 설정에서 조합을 바꿀 수 있으므로
+ * manifest 기본값이 아니라 실제 할당값을 표시한다.
+ */
+/*
+ * 지원/피드백 링크. 공식 Best Practices 가 in-app 피드백 경로를 권한다.
+ * 앱 안에서 웹을 렌더링하지 않고 기본 브라우저로 연다.
+ */
+/*
+ * 첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
+ * 설정이 갖춰지면 desktop.js 가 숨기므로 상시 노출되는 설명 영역이 아니다.
+ */
+.onboarding {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border: 1px solid rgba(94, 227, 161, 0.28);
+  border-radius: 8px;
+  background: rgba(94, 227, 161, 0.06);
+}
+
+.onboarding h2 {
+  margin-bottom: 12px;
+  color: var(--mint);
+  font-size: 14px;
+}
+
+.onboarding-steps {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.onboarding-note {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.desktop-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--mint);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.link-button:hover {
+  color: var(--text);
+}
+
+.link-button:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.hotkey-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.hotkey-list div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hotkey-list dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.hotkey-list dd {
+  margin: 0;
+  padding: 2px 7px;
+  border: 1px solid rgba(165, 197, 181, 0.22);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.diagnostics-list {
+  display: grid;
+  /* 진단 항목이 14개라 1열로 쌓으면 기본 창 높이(700px)를 혼자 넘긴다.
+     폭에 맞춰 열 수를 늘려 스캔하기 쉬운 밀도를 유지한다. */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin: 0;
+}
+
+.diagnostics-list div {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  min-width: 0;
+}
+
+/*
+ * 값이 긴 항목은 두 칸을 쓰게 해서 잘림을 줄인다.
+ * :has() 는 manifest 의 minimum-overwolf-version 0.170 클라이언트 CEF 에서
+ * 동작을 보장할 수 없으므로 마크업의 명시적 클래스로 지정한다.
+ */
+.diagnostics-list div.diagnostic-span {
+  grid-column: span 2;
+}
+
+.diagnostics-list dt {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.diagnostics-list dd {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diagnostics-list dd.diagnostic-wrap {
+  overflow: visible;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .overlay-shell {
@@ -121,86 +553,189 @@ h1 {
 }
 
 .overlay-card {
-  width: 400px;
-  min-height: 196px;
-  padding: 16px;
-  border: 1px solid rgba(151, 231, 191, 0.32);
-  border-radius: 8px;
-  background:
-    linear-gradient(135deg, rgba(9, 21, 19, 0.96), rgba(21, 36, 32, 0.92)),
-    url("assets/bgms-pattern.svg");
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28);
+  /* manifest in_game width 와 같게 두어 좌우 16px 를 낭비하지 않는다. */
+  width: 348px;
+  min-height: 58px;
+  padding: 5px 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.95),
+    0 0 5px rgba(0, 0, 0, 0.85);
+  opacity: var(--overlay-opacity);
 }
 
-.overlay-header {
+.mini-hud {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--line);
-}
-
-.overlay-header h1 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.15;
-}
-
-.phase-pill {
-  min-width: 84px;
-  padding: 7px 10px;
-  border: 1px solid rgba(94, 227, 161, 0.35);
-  border-radius: 999px;
-  background: rgba(94, 227, 161, 0.1);
-  color: var(--mint);
-  font-size: 12px;
+  align-items: center;
+  gap: 7px;
+  max-width: 100%;
+  min-height: 26px;
+  color: var(--text);
+  font-size: 10px;
   font-weight: 800;
-  text-align: center;
-}
-
-.metric-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
-}
-
-.metric {
-  min-height: 68px;
-  padding: 10px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.metric-label {
-  display: block;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
-.metric strong {
-  display: block;
-  margin-top: 5px;
-  font-size: 26px;
-  line-height: 1;
+.mini-brand {
+  flex: none;
+  color: var(--mint);
 }
 
-.status-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 10px;
-  margin-top: 12px;
+.mini-phase {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 68px;
+  color: var(--mint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/*
+ * 카운터 항목은 폭이 부족해도 창 밖으로 밀려나면 안 된다.
+ * KO 표시와 3자리 생존자 수가 겹치는 조합에서 alive 가 잘려 사라지는 문제가 있었다.
+ * 폭이 모자라면 라벨(span)만 줄어들고 수치(strong)는 항상 온전히 남는다.
+ */
+.mini-item {
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 3px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.mini-item span {
+  overflow: hidden;
   color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.mini-item strong {
+  flex: none;
+  color: var(--text);
   font-size: 12px;
 }
 
-.status-row span {
+.mini-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  max-width: 100%;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.25;
+}
+
+.mini-status span {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  min-height: 18px;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 기절 상태 표시. me.health의 ko_health로만 판단하며 데미지 수치는 노출하지 않는다. */
+.mini-flag {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(239, 100, 97, 0.18);
+  color: #ef6461;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+/* GEP 장애/부분 장애를 사용자에게 알리는 경고 라인 */
+.mini-warning {
+  flex: 1 1 100%;
+  color: #f6c667;
+}
+
+/* 전송 대기 중인 세션 요약 건수. 대기 항목이 없으면 숨긴다. */
+.mini-note {
+  flex: none;
+  color: var(--mint);
+}
+
+.text-button {
+  align-self: flex-start;
+  margin-top: 10px;
+  padding: 6px 10px;
+  border: 1px solid rgba(94, 227, 161, 0.4);
+  border-radius: 6px;
+  background: rgba(94, 227, 161, 0.1);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 버튼 두 개를 한 줄에 두되 좁아지면 줄바꿈한다. */
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-row .text-button {
+  margin-top: 10px;
+}
+
+/* 주된 행동(웹 기록 열기)을 시각적으로 구분한다. */
+.text-button.is-primary {
+  border-color: rgba(94, 227, 161, 0.6);
+  background: rgba(94, 227, 161, 0.18);
+  color: var(--mint);
+  font-weight: 700;
+}
+
+.text-button.is-primary:hover {
+  background: rgba(94, 227, 161, 0.28);
+}
+
+.text-button:hover {
+  border-color: var(--mint);
+  background: rgba(94, 227, 161, 0.2);
+}
+
+.text-button:focus-visible {
+  outline: 2px solid var(--mint);
+  outline-offset: 2px;
+}
+
+.debug-panel {
+  display: grid;
+  gap: 3px;
+  margin-top: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(165, 197, 181, 0.18);
+  color: rgba(210, 229, 219, 0.72);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.debug-panel span {
+  overflow: hidden;
+  min-height: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.is-hidden {
+  display: none;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
 }

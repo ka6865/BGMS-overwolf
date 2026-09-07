@@ -29,6 +29,7 @@ coverage/
 !.env.example
 
 # 오버울프 패키징 산출물
+*.zip
 *.opk
 *.owapp
 packages/

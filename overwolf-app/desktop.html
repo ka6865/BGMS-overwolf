@@ -8,38 +8,226 @@
   </head>
   <body class="desktop-shell">
     <main class="desktop-page">
+      <div class="desktop-titlebar" id="desktop-drag-handle" aria-label="Move BGMS Companion window" data-i18n-title="desktopDragHint" title="Drag to move window">
+        <span>BGMS Companion</span>
+        <div class="desktop-titlebar-actions">
+          <nav class="language-switcher" aria-label="Language">
+            <span data-i18n="languageLabel">Language</span>
+            <button type="button" data-language="en" aria-pressed="true" data-i18n="languageEnglish">English</button>
+            <button type="button" data-language="ko" aria-pressed="false" data-i18n="languageKorean">Korean</button>
+          </nav>
+          <button type="button" id="desktop-close" data-i18n-aria-label="closeDesktop" data-i18n-title="closeDesktop" aria-label="Close" title="Close">×</button>
+        </div>
+      </div>
+
       <section class="desktop-hero" aria-labelledby="app-title">
         <img src="assets/bgms-icon.svg" alt="" class="desktop-logo">
         <div>
-          <p class="eyebrow">BGMS Companion for PUBG</p>
-          <h1 id="app-title">Live match context, clean post-match handoff.</h1>
-          <p class="lede">
+          <p class="eyebrow" data-i18n="desktopEyebrow">BGMS Companion for PUBG</p>
+          <h1 id="app-title" data-i18n="desktopTitle">Live match context, clean post-match handoff.</h1>
+          <p class="lede" data-i18n="desktopLede">
             BGMS Companion shows a compact in-game status overlay and prepares a session summary for BGMS after the match ends.
           </p>
         </div>
       </section>
 
+      <!--
+        첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
+        전송을 켜고 닉네임을 넣으면 desktop.js 가 이 영역을 숨긴다.
+      -->
+      <section class="onboarding is-hidden" id="onboarding" aria-labelledby="onboarding-title">
+        <h2 id="onboarding-title" data-i18n="onboardingTitle">Two steps to get started</h2>
+        <ol class="onboarding-steps">
+          <li>
+            <span class="onboarding-step" id="onboarding-step-1" data-i18n="onboardingStepConsent">Turn on session handoff below and enter your PUBG nickname.</span>
+          </li>
+          <li>
+            <span class="onboarding-step" data-i18n="onboardingStepPlay">Play a match. When it ends, the summary travels to BGMS on its own.</span>
+          </li>
+        </ol>
+        <p class="onboarding-note" data-i18n="onboardingNote">
+          Nothing is sent until you turn it on. The overlay works either way, and you can open it in a match with the hotkey listed under overlay settings.
+        </p>
+      </section>
+
+      <section class="settings-grid" aria-label="Overlay settings">
+        <article class="panel handoff-panel">
+          <h2 data-i18n="handoffTitle">BGMS session handoff</h2>
+          <p class="panel-note" data-i18n="handoffNote">
+            When enabled, BGMS Companion sends one compact match summary to your BGMS account after each match ends.
+          </p>
+
+          <label class="control-row">
+            <span class="control-label" data-i18n="handoffToggleLabel">Send session summary to BGMS</span>
+            <input id="handoff-enabled" type="checkbox">
+          </label>
+
+          <label class="control-group">
+            <span class="control-label" data-i18n="playerNameLabel">BGMS nickname</span>
+            <input id="handoff-player-name" type="text" maxlength="32" autocomplete="off" spellcheck="false" placeholder="PUBG in-game name">
+          </label>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="platformLabel">Platform</span>
+            <div class="segmented-control" role="group" aria-label="Platform">
+              <button type="button" data-service-setting="platform" data-value="steam" aria-pressed="true">Steam</button>
+              <button type="button" data-service-setting="platform" data-value="kakao" aria-pressed="false">Kakao</button>
+            </div>
+          </div>
+
+          <p class="handoff-status" id="handoff-status" role="status"></p>
+          <div class="button-row">
+            <button type="button" id="handoff-retry" class="text-button" data-i18n="handoffRetry">Retry pending handoff</button>
+            <button type="button" id="open-session-history" class="text-button is-primary" data-i18n="openSessionHistory">Open my session history</button>
+          </div>
+        </article>
+
+        <article class="panel settings-panel">
+          <h2 data-i18n="settingsTitle">Overlay settings</h2>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="hotkeyLabel">Hotkeys</span>
+            <dl class="hotkey-list">
+              <div>
+                <dt data-i18n="hotkeyToggleOverlay">Show or hide overlay</dt>
+                <dd id="hotkey-toggle-overlay">--</dd>
+              </div>
+              <div>
+                <dt data-i18n="hotkeyOpenDesktop">Open this window</dt>
+                <dd id="hotkey-open-desktop">--</dd>
+              </div>
+            </dl>
+            <button type="button" id="edit-hotkeys" class="text-button" data-i18n="editHotkeys">Change in Overwolf settings</button>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="overlayModeLabel">Overlay mode</span>
+            <div class="segmented-control" role="group" aria-label="Overlay mode">
+              <button type="button" data-setting="mode" data-value="mini" data-i18n="overlayModeMini">Mini</button>
+              <button type="button" data-setting="mode" data-value="debug" data-i18n="overlayModeDebug">Debug</button>
+            </div>
+          </div>
+
+          <label class="control-group">
+            <span class="control-label">
+              <span data-i18n="opacityLabel">Opacity</span>
+              <output id="overlay-opacity-value" for="overlay-opacity">100%</output>
+            </span>
+            <input id="overlay-opacity" type="range" min="0.35" max="1" step="0.05" value="1" aria-valuetext="100%">
+          </label>
+
+          <div class="control-group">
+            <span class="control-label" data-i18n="positionLabel">Position</span>
+            <div class="segmented-control" role="group" aria-label="Overlay position">
+              <button type="button" data-setting="position" data-value="top-left" data-i18n="positionTopLeft">Top left</button>
+              <button type="button" data-setting="position" data-value="top-center" data-i18n="positionTopCenter">Top center</button>
+              <button type="button" data-setting="position" data-value="top-right" data-i18n="positionTopRight">Top right</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel diagnostics-panel">
+          <details class="diagnostics-disclosure" id="diagnostics-disclosure">
+            <summary>
+              <h2 data-i18n="diagnosticsTitle">Live diagnostics</h2>
+              <span class="diagnostics-hint" id="diagnostics-hint" data-i18n="diagnosticsIdle">No issues detected</span>
+            </summary>
+            <dl class="diagnostics-list">
+            <div>
+              <dt data-i18n="gepStatusLabel">GEP status</dt>
+              <dd id="desktop-gep-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="serviceStatusLabel">Event service status</dt>
+              <dd id="desktop-service-status" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gameStatusLabel">Game</dt>
+              <dd id="desktop-game-status">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="matchIdLabel">Match ID</dt>
+              <dd id="desktop-match-id" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="lastEventLabel">Last event</dt>
+              <dd id="desktop-last-event" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="recentUpdatesLabel">Recent updates</dt>
+              <dd id="desktop-recent-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div class="diagnostic-span">
+              <dt data-i18n="seenFeaturesLabel">Seen features</dt>
+              <dd id="desktop-seen-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div class="diagnostic-span">
+              <dt data-i18n="supportedFeaturesLabel">Supported features</dt>
+              <dd id="desktop-supported-features" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="missingUpdatesLabel">Missing updates</dt>
+              <dd id="desktop-missing-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="ignoredUpdatesLabel">Ignored updates</dt>
+              <dd id="desktop-ignored-updates" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepVersionLabel">GEP version</dt>
+              <dd id="desktop-gep-version">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="gepErrorLabel">GEP error</dt>
+              <dd id="desktop-gep-error" class="diagnostic-wrap">--</dd>
+            </div>
+            <div>
+              <dt data-i18n="handoffLabel">Session handoff</dt>
+              <dd id="desktop-handoff" class="diagnostic-wrap">--</dd>
+            </div>
+            <div class="diagnostic-span">
+              <dt data-i18n="requiredResultLabel">Required result</dt>
+              <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
+            </div>
+            </dl>
+            <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
+          </details>
+        </article>
+      </section>
+
       <section class="desktop-grid" aria-label="App status">
         <article class="panel">
-          <h2>Phase 1 scope</h2>
+          <h2 data-i18n="phaseScopeTitle">Phase 1 scope</h2>
           <ul class="scope-list">
-            <li>Match start and match end state</li>
-            <li>Phase, local health, weapon state</li>
-            <li>Kills, deaths, revives, killer notice</li>
-            <li>Roster-based alive player count</li>
+            <li data-i18n="phaseScopeMatch">Match start and match end state</li>
+            <li data-i18n="phaseScopeState">Phase, local health, weapon state</li>
+            <li data-i18n="phaseScopeEvents">Kills, deaths, revives, killer notice</li>
+            <li data-i18n="phaseScopeRoster">Roster-based alive player count</li>
           </ul>
         </article>
 
         <article class="panel">
-          <h2>Policy guardrails</h2>
+          <h2 data-i18n="guardrailsTitle">Policy guardrails</h2>
           <ul class="scope-list">
-            <li>No real-time damage meter</li>
-            <li>No live location or minimap</li>
-            <li>No PUBG API calls from live GEP triggers</li>
-            <li>No service role or Supabase secrets in the app</li>
+            <li data-i18n="guardrailDamage">No real-time damage meter</li>
+            <li data-i18n="guardrailLocation">No live location or minimap</li>
+            <li data-i18n="guardrailPubgApi">No PUBG API calls from live GEP triggers</li>
+            <li data-i18n="guardrailSecrets">No service role or Supabase secrets in the app</li>
           </ul>
         </article>
       </section>
+
+      <footer class="desktop-footer">
+        <span data-i18n="footerHelp">Questions or feedback?</span>
+        <button type="button" id="open-community" class="link-button" data-i18n="footerCommunity">BGMS community</button>
+        <span aria-hidden="true">·</span>
+        <button type="button" id="open-discord" class="link-button" data-i18n="footerDiscord">Discord</button>
+      </footer>
     </main>
+
+    <script src="i18n.js"></script>
+    <script src="settings.js"></script>
+    <script src="gep-state.js"></script>
+    <script src="desktop.js"></script>
   </body>
 </html>

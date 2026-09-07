@@ -1,0 +1,36 @@
+name: Verify Overwolf runtime
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: ${{ matrix.os }} / Node 24
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm run verify
+      - name: Upload unpacked runtime
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: bgms-companion-unpacked
+          path: dist/bgms-companion
+          if-no-files-found: error
+          retention-days: 7
