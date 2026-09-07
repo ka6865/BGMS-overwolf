@@ -89,7 +89,7 @@
     extensions: {
       current: {
         getManifest: function (callback) {
-          callback({ meta: { version: "0.5.0" } });
+          callback({ meta: { version: "0.5.1" } });
         }
       }
     },
@@ -271,7 +271,8 @@
         state: statusState,
         maintenance_msg: message || ""
       };
-      window.mockGep.fireGameInfoUpdated({ id: PUBG_INSTANCE_ID, classId: 10906, isRunning: true, logicalWidth: 1920 });
+      // 포커스 변경은 더 이상 상태 조회를 일으키지 않으므로 진단 새로고침으로 반영한다.
+      if (window.bgmsController) window.bgmsController.refreshDiagnostics();
     },
     triggerHotkey: function (name) {
       hotkeyListeners.forEach(function (listener) {

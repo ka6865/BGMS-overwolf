@@ -2,7 +2,7 @@
 
 이 문서는 Overwolf PUBG GEP 테스트 중 헷갈리지 않도록 공식 문서에서 확인한 API 호출, feature, payload 기준을 정리한다. 구현 지시가 아니라 기준표이며, 실제 구현 전에는 링크된 공식 문서를 다시 확인한다.
 
-**최근 확인일: 2026-07-31**
+**최근 확인일: 2026-09-07 (게임 정보 갱신, 개발 환경, 핫키 기준 재확인)**
 
 ## 기준 문서
 
@@ -221,7 +221,7 @@ state 코드:
 ## 언어 API 기준 (2026-07-30 확인)
 
 - 공식 호출은 `overwolf.settings.language.get(callback)`이고 결과는 `{success, language}`(두 자리 ISO)다. `onLanguageChanged` 이벤트도 있다.
-- 현재 구현은 사용자가 앱에서 언어를 고른 적이 없을 때만 Overwolf 언어가 `ko*`이면 한국어를 적용한다. 기본값은 영어이며 한국어는 optional localization이다.
+- 0.5.0은 Overwolf 언어가 `ko*`이면 한국어를 자동 선택했다. 0.5.1은 영어 기본 경험을 지키기 위해 이 자동 선택을 제거했다. 저장된 사용자 선택은 유지하고 한국어는 앱 설정에서 직접 선택한다.
 
 ## 현재 테스트 판정 기준
 
@@ -264,7 +264,7 @@ desktop 진단을 기준으로 판단한다.
 - 클라이언트는 이 엔드포인트 외에 BGMS 도메인으로 어떤 요청도 보내지 않는다. Supabase에 직접 접근하지 않는다.
 - 전송 조건: 사용자가 데스크탑 창에서 전송을 켜고 BGMS 닉네임을 입력한 경우에만. 기본값은 꺼짐이다.
 - 전송 payload 키: `session_id`, `match_id`, `pseudo_match_id`, `player_id`, `platform`, `gep_summary`, `client_environment`. 서버가 화이트리스트 밖의 키를 버리므로 클라이언트에서 임의 키를 추가해도 저장되지 않는다.
-- 재시도: 5s, 15s, 60s, 5m, 15m 백오프로 최대 5회. `429`와 `5xx`, 네트워크 오류만 재시도하고 그 외 `4xx`는 영구 거부로 간주해 큐에서 제거한다.
+- 재시도: 최초 요청을 포함해 최대 5회이며, 실제 대기는 5s, 15s, 60s, 5m이다. 기존 상수의 15m 항목은 최대 시도 수 때문에 사용되지 않는다. `429`와 `5xx`, 네트워크 오류만 재시도하고 그 외 `4xx`는 영구 거부로 간주해 큐에서 제거한다.
 - 큐는 localStorage(`bgms_companion_session_queue`)에 보존되므로 앱 재시작 후에도 이어서 전송된다.
 - `player_id`는 GEP 닉네임이 아니라 사용자가 직접 입력한 값이다. GEP 닉네임을 identity로 신뢰하지 않는다는 원칙을 유지한다.
 - Overwolf 앱 창의 origin은 `overwolf-extension://`이므로 서버 라우트에 CORS(`OPTIONS` + `Access-Control-Allow-*`)를 명시했다.
@@ -437,3 +437,23 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 로드 실패 문구 없음
 
 로컬 검증 제약: `localhost` 에서는 R2 CORS 가 허용되지 않아 텔레메트리 페치가 `ERR_FAILED` 로 막힌다. 텔레메트리 API 자체는 로컬에서도 200 을 반환하므로 시점 계산은 순수 함수 테스트로 고정하고 렌더 확인은 운영에서 한다.
+
+
+## 0.5.1 성능·안정성 기준 (2026-09-07)
+
+### 공식 문서 재확인
+
+- [overwolf.games](https://dev.overwolf.com/ow-native/reference/games/ow-games/): `onGameInfoUpdated`는 게임 실행/종료뿐 아니라 포커스 변화에도 발생한다. 모든 수신을 새 게임 시작으로 처리하면 안 된다. `RunningGameInfo`의 `logicalWidth`/`width`로 기존 위치 프리셋을 재계산한다. 새 권한은 추가하지 않았다.
+- 같은 문서에서 `getRunningGameInfo`는 deprecated이며 대체 API `getRunningGameInfo2`는 0.188부터다. 현재 앱 최소 버전 0.170과의 호환을 위해 이번에는 기존 호출을 유지한다. 최소 버전 조정과 대체 API 전환은 다음 Windows 호환 검증 항목이다.
+- [Hotkeys API](https://dev.overwolf.com/ow-native/reference/settings/hotkeys-api/): 기존 `Hotkeys` 권한으로 `get`/`onChanged`를 쓴다. 전역 목록(`globals`)을 읽고 PUBG 목록(`games["10906"]`)을 우선 적용한다. `IsUnassigned`는 빈 바인딩으로 취급하며 UI가 기본 조합으로 대체하지 않는다. 창 종료 시 `onChanged` 리스너를 제거한다.
+- [개발 환경](https://dev.overwolf.com/ow-native/getting-started/onboarding-resources/setting-up-dev-environment/): 미출시/unpacked 앱 로드는 whitelisting이 전제다. `npm run build`는 실행 폴더를 준비할 뿐 OPK 서명·스토어 승인을 수행하지 않는다.
+- [Best practices](https://dev.overwolf.com/ow-native/guides/general-product/best-practices/): 불필요한 배포 파일을 제외하고 다양한 해상도에서 검증한다. 지원 페이지의 FAQ/문제 해결/변경 이력도 공개 출시 전 점검 대상이다.
+
+### 구현 선택과 자동 테스트 결과 (실게임 관측값 아님)
+
+- 게임 진입과 포커스 갱신을 구분한다. 상태 조회는 PUBG 진입/진단 새로고침에만 실행하며, 해상도 변경은 표시 중인 HUD 위치에만 반영한다. 사용자가 숨긴 HUD를 포커스 갱신으로 복원하지 않는다.
+- GEP 리듀서와 세션 요약 생성은 즉시 실행하고 UI 구독 알림만 50ms 단위로 합친다. 구독 창이 없으면 알림용 직렬화/타이머를 만들지 않는다. 접힌 진단과 숨긴 debug 문자열도 렌더하지 않는다.
+- 30초 고정 큐 폴링을 제거했다. 전송 동의가 있고 큐가 남아 있을 때 가장 이른 재시도 시각에 단일 타이머를 예약한다. 성공뿐 아니라 거부/실패 뒤에도 다른 전송 가능한 항목을 처리한다.
+- 세션 POST는 15초에 타임아웃 처리하고 지원 런타임에서는 `AbortController`로 중단한다. 지원하지 않아도 큐 잠금은 해제되며 늦은 응답은 중복 반영하지 않는다. 재시도는 네트워크 오류/429/5xx만 허용한다.
+- 게임 종료/교체 전의 구독 응답과 snapshot은 현재 상태를 덮어쓰지 않는다. snapshot 요청 뒤 새 라이브 데이터가 수신되었으면 오래된 snapshot도 적용하지 않는다.
+- GEP feature/key/value 파서는 변경하지 않았다. 실게임 수신 여부와 FPS/CPU 효과는 [Windows 절차](windows-test-guide.md)에 따라 별도로 기록해야 한다.

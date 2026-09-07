@@ -116,3 +116,18 @@ test("describeQueue: 대기 건수와 마지막 오류를 요약한다", () => {
   assert.equal(description.lastError, "http_503");
   assert.equal(description.nextAttemptAt, 2000 + sessionQueue.BACKOFF_MS[0]);
 });
+
+test("applyResult: 허용한 재시도 상태가 아닌 3xx는 큐에서 제거한다", () => {
+  const result = sessionQueue.applyResult(sessionQueue.enqueue([], payload("a")), "a", { ok: false, status: 302 });
+  assert.equal(result.outcome, "rejected");
+  assert.equal(result.queue.length, 0);
+});
+
+test("describeQueue: FIFO 첫 항목이 아닌 가장 가까운 재시도 시각을 보고한다", () => {
+  const description = sessionQueue.describeQueue([
+    { payload: payload("later"), nextAttemptAt: 9000, lastError: "http_503" },
+    { payload: payload("sooner"), nextAttemptAt: 5000, lastError: "http_429" }
+  ]);
+  assert.equal(description.nextAttemptAt, 5000);
+  assert.equal(description.lastError, "http_429");
+});

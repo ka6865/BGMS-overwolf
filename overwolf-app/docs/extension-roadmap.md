@@ -1,6 +1,6 @@
 # BGMS Companion 확장 로드맵
 
-이 문서는 BGMS Overwolf 앱이 Phase 1 MVP 이후 어디까지 확장될 수 있는지 정리한다. 현재 구현 범위는 여전히 Phase 0~1이며, 아래 항목은 구현 지시가 아니라 향후 검토 지도다.
+이 문서는 BGMS Overwolf 앱이 Phase 1 MVP 이후 어디까지 확장될 수 있는지 정리한다. 현재 코드는 Phase 1과 승인된 HUD 재구성·세션 handoff·사후 리뷰 연결을 포함한다. 아래 미구현 항목은 추가 구현 지시가 아니라 향후 검토 지도다.
 
 ## 문서 기준과 범위
 
@@ -318,7 +318,7 @@ HUD 에서 제거 완료 (배그 기본 HUD와 중복). 리듀서는 계속 수�
 
 - HUD 위치 프리셋, compact/expanded 모드, 디버그 표시 토글
 - Overwolf hotkey settings deep link 제공
-- Overwolf client language 기반 기본 언어 자동 선택
+- 앱 내 명시적 언어 선택 유지 (0.5.1부터 Overwolf 언어에 따른 자동 선택 제거)
 - ping 같은 성능성 counter 표시 여부를 optional HUD로 검토
 - 로컬 설정 export/import는 필요할 때만 `io` 또는 localStorage 기반으로 검토
 
@@ -379,3 +379,15 @@ HUD 에서 제거 완료 (배그 기본 HUD와 중복). 리듀서는 계속 수�
 - OBS API: https://dev.overwolf.com/ow-native/reference/obs/
 - OIDC API: https://dev.overwolf.com/ow-native/reference/overwolf-oidc/ow-oidc/
 - App Subscriptions API: https://dev.overwolf.com/ow-native/reference/subscriptions-api/
+
+
+## 0.5.1 출시 준비 갱신 (2026-09-07)
+
+기능 범위를 넓히지 않고 기존 이벤트 처리/화면 전달/큐 재시도를 개선했다. [출시 준비 현황](release-readiness.md)과 [Windows 테스트 절차](windows-test-guide.md)를 기준으로 다음을 확인한다.
+
+1. `main`의 테스트와 Ubuntu/Windows CI 통과 후 unpacked 실행 폴더로 실환경 검증한다.
+2. 실제 `match_id` 수신과 맵 리뷰 진입을 우선 검증한다. 이 연결이 사용자 가치의 핵심이며 mock 결과로 완료 처리하지 않는다.
+3. 최소 버전 0.170 호환으로 유지한 deprecated `getRunningGameInfo`는 0.188+ 대체 API 전환과 함께 Windows에서 검증할 후속 항목이다. 이번 릴리스에는 새 Overwolf API나 권한을 추가하지 않았다 (`onChanged`는 기존 핫키 API/권한 내 연결).
+4. CPU/FPS/장시간 메모리, 실게임 HUD 스크린샷, OPK, 지원 페이지, Developer Console 심사는 아직 공개 출시 전 확인 항목이다.
+
+코드 기본 언어는 영어이며 한국어는 명시적 설정 선택으로만 적용한다. 영상·자동 분석·좌표 표시·구독 기능은 추가 승인 없이 구현하지 않는다.

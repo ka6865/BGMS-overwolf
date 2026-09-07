@@ -306,7 +306,7 @@
   function setText(id, text) {
     var element = document.getElementById(id);
 
-    if (element) {
+    if (element && element.textContent !== text) {
       element.textContent = text;
     }
   }
@@ -331,10 +331,16 @@
       return false;
     }
 
+    // 접힌 진단은 업데이트를 저장만 하고, 사용자가 열 때 최신 상태로 한 번 렌더한다.
+    setText("handoff-status", describeHandoff(state || {}));
+    updateDiagnosticsDisclosure(state);
+
+    if (!isDiagnosticsOpen()) {
+      return;
+    }
+
     if (!state) {
       // 컨트롤러가 아직 없어도(미리보기/기동 직전) 전송 설정 상태는 보여줄 수 있다.
-      setText("handoff-status", describeHandoff({}));
-      updateDiagnosticsDisclosure(null);
       return;
     }
 
@@ -359,8 +365,6 @@
     setText("desktop-gep-error", state.gepErrorReason || "--");
     setText("desktop-handoff", describeHandoff(state));
     setText("desktop-required-result", state.lastRequiredFeaturesResult || "--");
-    setText("handoff-status", describeHandoff(state));
-    updateDiagnosticsDisclosure(state);
   }
 
   /*
@@ -368,6 +372,13 @@
    * 사용자가 직접 접은 뒤에는 다시 강제로 펼치지 않는다.
    */
   var diagnosticsAutoOpened = false;
+
+  function isDiagnosticsOpen() {
+    var disclosure = document.getElementById("diagnostics-disclosure");
+
+    // 이전 마크업에는 disclosure가 없을 수 있으므로 그 경우에는 기존처럼 렌더한다.
+    return !disclosure || disclosure.open;
+  }
 
   function updateDiagnosticsDisclosure(state) {
     var disclosure = document.getElementById("diagnostics-disclosure");
@@ -377,9 +388,9 @@
       && window.bgmsGepState.isServiceDegraded(state);
 
     if (hint) {
-      hint.textContent = degraded
+      setText("diagnostics-hint", degraded
         ? (state.gepErrorReason || t("diagnosticsAttention"))
-        : t("diagnosticsIdle");
+        : t("diagnosticsIdle"));
       hint.classList.toggle("is-warning", degraded);
     }
 
@@ -408,10 +419,17 @@
     var fallback = { toggle_overlay: "Ctrl+Shift+B", open_desktop: "Ctrl+Shift+G" };
 
     function render(assigned) {
-      var values = assigned || fallback;
+      var t = window.bgmsI18n.translate;
 
-      setText("hotkey-toggle-overlay", values.toggle_overlay || fallback.toggle_overlay);
-      setText("hotkey-open-desktop", values.open_desktop || fallback.open_desktop);
+      // API 실패 때만 manifest 기본값을 안내하고, 명시적 미할당은 그대로 표시한다.
+      if (!assigned) {
+        setText("hotkey-toggle-overlay", fallback.toggle_overlay);
+        setText("hotkey-open-desktop", fallback.open_desktop);
+        return;
+      }
+
+      setText("hotkey-toggle-overlay", assigned.toggle_overlay || t("hotkeyUnassigned"));
+      setText("hotkey-open-desktop", assigned.open_desktop || t("hotkeyUnassigned"));
     }
 
     if (!controller || typeof controller.getAssignedHotkeys !== "function") {
@@ -420,6 +438,32 @@
     }
 
     controller.getAssignedHotkeys(render);
+  }
+
+  var hotkeyChangedListener = null;
+
+  function bindHotkeyChanges() {
+    var hotkeys = typeof overwolf !== "undefined" && overwolf.settings && overwolf.settings.hotkeys;
+
+    if (!hotkeys || !hotkeys.onChanged || typeof hotkeys.onChanged.addListener !== "function") {
+      return;
+    }
+
+    hotkeyChangedListener = function () {
+      syncHotkeyDisplay();
+    };
+    hotkeys.onChanged.addListener(hotkeyChangedListener);
+  }
+
+  function cleanupHotkeyChanges() {
+    var hotkeys = typeof overwolf !== "undefined" && overwolf.settings && overwolf.settings.hotkeys;
+
+    if (hotkeyChangedListener && hotkeys && hotkeys.onChanged
+      && typeof hotkeys.onChanged.removeListener === "function") {
+      hotkeys.onChanged.removeListener(hotkeyChangedListener);
+    }
+
+    hotkeyChangedListener = null;
   }
 
   /*
@@ -496,6 +540,20 @@
     });
   }
 
+  function bindDiagnosticsDisclosure() {
+    var disclosure = document.getElementById("diagnostics-disclosure");
+
+    if (!disclosure) {
+      return;
+    }
+
+    disclosure.addEventListener("toggle", function () {
+      if (disclosure.open) {
+        renderDiagnostics(lastDiagnosticsState);
+      }
+    });
+  }
+
   var lastDiagnosticsState = null;
 
   function handleDiagnosticsState(state) {
@@ -522,12 +580,14 @@
   bindDesktopClose();
   bindRefreshButton();
   bindHotkeyControls();
+  bindHotkeyChanges();
   bindFooterLinks();
   syncLanguageButtons();
   syncSettingsControls();
   syncServiceSettingsControls();
   subscribeDiagnostics();
   syncHotkeyDisplay();
+  bindDiagnosticsDisclosure();
 
   window.addEventListener("bgms:language-change", function () {
     window.bgmsI18n.applyTranslations(document);
@@ -549,4 +609,6 @@
       renderDiagnostics(lastDiagnosticsState);
     }
   });
+
+  window.addEventListener("beforeunload", cleanupHotkeyChanges);
 })();

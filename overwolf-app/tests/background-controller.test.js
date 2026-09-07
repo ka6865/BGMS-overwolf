@@ -87,6 +87,10 @@ function createSandbox(options) {
     sandbox.mockGep.setSessionNetworkDown(true);
   }
 
+  if (options && options.configure) {
+    options.configure(sandbox);
+  }
+
   loadScript(sandbox, "background.js");
 
   sandbox.readStoredQueue = function () {
@@ -465,4 +469,212 @@ test("openExternalLink: 화이트리스트 키만 열고 임의 URL은 거부한
       "예상 밖의 URL이 열렸다: " + url
     );
   });
+});
+
+// 실제 시간을 기다리지 않고 재시도 시각과 유휴 타이머를 검증한다.
+function installClock(sandbox) {
+  let timestamp = 100000;
+  let nextId = 0;
+  const timers = new Map();
+  sandbox.Date = class extends Date {
+    constructor(...args) { super(...(args.length ? args : [timestamp])); }
+    static now() { return timestamp; }
+  };
+  sandbox.setTimeout = (callback, delay) => {
+    timers.set(++nextId, { callback, at: timestamp + delay });
+    return nextId;
+  };
+  sandbox.clearTimeout = (id) => timers.delete(id);
+  sandbox.setInterval = () => { throw new Error("유휴 폴링은 허용하지 않는다"); };
+  return {
+    pending: () => timers.size,
+    async tick(ms) {
+      const end = timestamp + ms;
+      for (;;) {
+        // fetch 및 응답 JSON의 마이크로태스크를 먼저 처리한다.
+        for (let i = 0; i < 10; i++) await Promise.resolve();
+        const due = [...timers].filter(([, timer]) => timer.at <= end).sort((a, b) => a[1].at - b[1].at)[0];
+        if (!due) break;
+        timestamp = due[1].at;
+        timers.delete(due[0]);
+        due[1].callback();
+      }
+      timestamp = end;
+    }
+  };
+}
+
+const runningPubg = { id: 109061, classId: 10906, isRunning: true, logicalWidth: 1920 };
+
+test("포커스 갱신 100회는 숨긴 HUD를 다시 띄우거나 상태 서버를 재조회하지 않는다", () => {
+  let restores = 0;
+  let statusRequests = 0;
+  const sandbox = createSandbox({ configure(s) {
+    const fetch = s.fetch;
+    s.fetch = (...args) => { statusRequests++; return fetch(...args); };
+    s.overwolf.windows.restore = (_id, callback) => { restores++; callback(); };
+  } });
+  const initialRequests = statusRequests;
+  const initialRestores = restores;
+  sandbox.bgmsController.hideOverlay();
+  sandbox.mockGep.resetWindowCalls();
+  for (let i = 0; i < 100; i++) sandbox.mockGep.fireGameInfoUpdated(runningPubg);
+  assert.equal(statusRequests, initialRequests);
+  assert.equal(restores, initialRestores);
+  assert.equal(sandbox.mockGep.windowSizeCalls().length, 0);
+  sandbox.bgmsController.showOverlay();
+  assert.equal(restores, initialRestores + 1);
+  sandbox.mockGep.resetWindowCalls();
+  sandbox.mockGep.fireGameInfoUpdated({ ...runningPubg, logicalWidth: 2560 });
+  assert.equal(sandbox.mockGep.windowPositionCalls().length, 1);
+});
+
+test("이벤트 100개를 손실 없이 반영하고 UI 알림은 50ms마다 한 번으로 합친다", async () => {
+  let clock;
+  const sandbox = createSandbox({ configure(s) { clock = installClock(s); } });
+  await clock.tick(2000);
+  let notifications = 0;
+  let latest;
+  const unsubscribe = sandbox.bgmsController.subscribe((state) => { notifications++; latest = state; });
+  for (let i = 0; i < 100; i++) sandbox.mockGep.fireEvent("kill", "");
+  assert.equal(sandbox.bgmsController.getState().kills, 100);
+  assert.equal(notifications, 1, "구독 시 첫 스냅샷만 즉시 전달한다");
+  await clock.tick(50);
+  assert.equal(notifications, 2);
+  assert.equal(latest.kills, 100);
+  sandbox.mockGep.fireEvent("kill", "");
+  unsubscribe();
+  assert.equal(clock.pending(), 0);
+});
+
+test("전송 꺼짐 또는 빈 큐에서는 주기적으로 깨우는 타이머가 없다", async () => {
+  for (const settings of [{ handoffEnabled: false }, { handoffEnabled: true, playerName: "Player" }]) {
+    let clock;
+    createSandbox({ settings, configure(s) { clock = installClock(s); } });
+    await clock.tick(2000);
+    assert.equal(clock.pending(), 0);
+  }
+});
+
+test("15초 무응답 전송은 한 번 실패 처리하고 5초 뒤 재시도하며 늦은 응답은 무시한다", async () => {
+  let clock;
+  let finishStalled;
+  let calls = 0;
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    configure(s) {
+      clock = installClock(s);
+      const fetch = s.fetch;
+      s.fetch = (url, options) => {
+        if (!url.includes("/api/overwolf/session")) return fetch(url, options);
+        calls++;
+        if (calls === 1) return new Promise((resolve) => { finishStalled = resolve; });
+        return Promise.resolve({ ok: true, status: 200 });
+      };
+    }
+  });
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  await clock.tick(15000);
+  assert.equal(sandbox.readStoredQueue()[0].attempts, 1);
+  assert.equal(sandbox.readStoredQueue()[0].nextAttemptAt, 120000);
+  finishStalled({ ok: true, status: 200 });
+  await clock.tick(0);
+  assert.equal(sandbox.readStoredQueue().length, 1);
+  await clock.tick(4999);
+  assert.equal(calls, 1);
+  await clock.tick(1);
+  assert.equal(calls, 2);
+  assert.equal(sandbox.readStoredQueue().length, 0);
+  assert.equal(clock.pending(), 0);
+});
+
+test("첫 세션이 영구 거부되어도 다음 세션을 즉시 전송한다", async () => {
+  let clock;
+  const requests = [];
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    queue: [{ payload: { session_id: "reject" } }, { payload: { session_id: "accept" } }],
+    configure(s) {
+      clock = installClock(s);
+      const fetch = s.fetch;
+      s.fetch = (url, options) => {
+        if (!url.includes("/api/overwolf/session")) return fetch(url, options);
+        const id = JSON.parse(options.body).session_id;
+        requests.push(id);
+        return Promise.resolve({ ok: id === "accept", status: id === "accept" ? 200 : 422 });
+      };
+    }
+  });
+  await clock.tick(0);
+  assert.deepEqual(requests, ["reject", "accept"]);
+  assert.equal(sandbox.readStoredQueue().length, 0);
+});
+
+test("전송 동의를 끄면 예약 재시도를 취소하고 다시 켜면 보존된 큐를 전송한다", async () => {
+  let clock;
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    networkDown: true,
+    configure(s) { clock = installClock(s); }
+  });
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  await clock.tick(2000);
+  sandbox.bgmsSettings.write({ handoffEnabled: false, playerName: "Player" });
+  sandbox.bgmsController.applyServiceSettings({ handoffEnabled: false, playerName: "Player" });
+  assert.equal(clock.pending(), 0);
+  await clock.tick(10000);
+  assert.equal(sandbox.readStoredQueue()[0].attempts, 1);
+  sandbox.mockGep.setSessionNetworkDown(false);
+  sandbox.bgmsSettings.write({ handoffEnabled: true, playerName: "Player" });
+  sandbox.bgmsController.applyServiceSettings({ handoffEnabled: true, playerName: "Player" });
+  await clock.tick(0);
+  assert.equal(sandbox.readStoredQueue().length, 0);
+});
+
+test("게임 종료 뒤 도착한 getInfo 응답과 GEP 이벤트는 새 런타임을 오염시키지 않는다", () => {
+  let pending;
+  const sandbox = createSandbox({ configure(s) {
+    s.overwolf.games.events.getInfo = (callback) => { pending = callback; };
+  } });
+  sandbox.mockGep.fireGameInfoUpdated({ ...runningPubg, isRunning: false });
+  pending({ success: true, res: { game_info: { phase: "landed" } } });
+  sandbox.mockGep.fireEvent("kill", "");
+  assert.equal(sandbox.bgmsController.getState().phase, "Idle");
+  assert.equal(sandbox.bgmsController.getState().kills, 0);
+});
+
+test("이전 게임의 구독 응답은 현재 게임의 진행 중 구독을 해제하지 않는다", () => {
+  const callbacks = [];
+  const sandbox = createSandbox({ configure(s) {
+    s.overwolf.games.events.setRequiredFeatures = (_features, callback) => callbacks.push(callback);
+  } });
+  sandbox.mockGep.fireGameInfoUpdated({ ...runningPubg, isRunning: false });
+  sandbox.mockGep.fireGameInfoUpdated(runningPubg);
+  callbacks[0]({ success: false });
+  sandbox.bgmsController.ensureGepSubscription();
+  assert.equal(callbacks.length, 2);
+});
+
+test("핫키 전역 바인딩과 해제 상태를 읽고 PUBG 설정을 우선한다", () => {
+  const sandbox = createSandbox();
+  sandbox.overwolf.settings.hotkeys.get = (callback) => callback({
+    success: true,
+    games: { "10906": [{ name: "toggle_overlay", binding: "Ctrl+B", IsUnassigned: true }] },
+    globals: [{ name: "open_desktop", binding: "Alt+D" }, { name: "toggle_overlay", binding: "Alt+B" }]
+  });
+  sandbox.bgmsController.getAssignedHotkeys((assigned) => {
+    assert.equal(assigned.toggle_overlay, "");
+    assert.equal(assigned.open_desktop, "Alt+D");
+  });
+});
+
+test("Overwolf 언어가 한국어여도 앱이 사용자 언어 선택을 자동으로 만들지 않는다", () => {
+  let writes = 0;
+  createSandbox({ configure(s) {
+    s.bgmsI18n = { hasStoredLanguage: () => false, setLanguage: () => { writes++; } };
+    s.overwolf.settings.language.get = (callback) => callback({ success: true, language: "ko" });
+  } });
+  assert.equal(writes, 0);
 });

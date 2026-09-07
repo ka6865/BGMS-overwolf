@@ -67,6 +67,11 @@
     if (elements.debugGep) {
       elements.debugGep.parentElement.classList.toggle("is-hidden", settings.mode !== "debug");
     }
+
+    // 디버그 모드로 전환할 때 최신 상태를 즉시 채운다.
+    if (settings.mode === "debug") {
+      render(lastState);
+    }
   }
 
   // 공식 status code: 0 unsupported, 1 green, 2 yellow, 3 red
@@ -93,7 +98,7 @@
   }
 
   function setText(element, text) {
-    if (element) {
+    if (element && element.textContent !== text) {
       element.textContent = text;
     }
   }
@@ -124,6 +129,11 @@
     if (element) {
       element.classList.toggle("is-hidden", hidden);
     }
+  }
+
+  function isDebugVisible() {
+    return Boolean(elements.debugGep && elements.debugGep.parentElement
+      && !elements.debugGep.parentElement.classList.contains("is-hidden"));
   }
 
   /*
@@ -197,13 +207,16 @@
       ? t("handoffPending") + " " + String(state.handoffPending)
       : "");
 
-    setText(elements.debugGep, t("gep") + " " + (state.gepStatus || "idle"));
-    setText(elements.debugGame, t("game") + " " + (state.detectedClassId || "--") + " (" + (state.detectedGameId || "--") + ") / " + (state.detectedGameRunning ? t("run") : t("off")));
-    setText(elements.debugLast, t("last") + " " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-"));
-    setText(elements.debugRaw, t("raw") + " " + (state.lastRawValue || "--"));
-    setText(elements.debugRecent, t("recent") + " " + ((state.recentUpdates || []).join(" | ") || "--"));
-    setText(elements.debugService, t("serviceStatusLabel") + " " + translateServiceStatus(state.serviceStatusState));
-    setText(elements.debugError, t("gepErrorLabel") + " " + (state.gepErrorReason || "--"));
+    // 기본 HUD에서는 숨긴 진단 문자열을 만들거나 DOM에 쓰지 않는다.
+    if (isDebugVisible()) {
+      setText(elements.debugGep, t("gep") + " " + (state.gepStatus || "idle"));
+      setText(elements.debugGame, t("game") + " " + (state.detectedClassId || "--") + " (" + (state.detectedGameId || "--") + ") / " + (state.detectedGameRunning ? t("run") : t("off")));
+      setText(elements.debugLast, t("last") + " " + (state.lastFeature || "-") + ":" + (state.lastKey || state.lastGepEventName || "-"));
+      setText(elements.debugRaw, t("raw") + " " + (state.lastRawValue || "--"));
+      setText(elements.debugRecent, t("recent") + " " + ((state.recentUpdates || []).join(" | ") || "--"));
+      setText(elements.debugService, t("serviceStatusLabel") + " " + translateServiceStatus(state.serviceStatusState));
+      setText(elements.debugError, t("gepErrorLabel") + " " + (state.gepErrorReason || "--"));
+    }
   }
 
   function subscribeToController() {

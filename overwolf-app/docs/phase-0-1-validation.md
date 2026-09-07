@@ -1,13 +1,13 @@
 # Phase 0-1 Validation Checklist
 
-Last updated: 2026-07-31
+Last updated: 2026-09-07
 
 ## Automated Checks (no game required)
 
 Run on macOS or any dev machine:
 
 ```bash
-npm test   # node --test overwolf-app/tests/*.test.js
+npm run verify
 ```
 
 - `gep-state.test.js` covers PUBG official payload shapes: phase, match, match_info, kill, roster, me (health/weaponState), killer, knockedout, gep_internal, blocked payloads, matchEnd idempotency, session summary shape.
@@ -23,9 +23,13 @@ Manual UI harness (browser, no Overwolf client):
 open overwolf-app/dev-harness/mock.html
 ```
 
-Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, ignored `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, the GEP-data-missing failure case, session handoff with 200/503/422 responses, network-down queue retention, and a backoff-skipping flush. The harness intercepts `/api/overwolf/session`, so no request reaches production.
+Scenarios cover match start, kill, knock/revive, roster elimination, death + killer, duplicate matchEnd, feature-scoped `rank`/`map` payloads, blocked payloads, `onError`, degraded service status, the GEP-data-missing failure case, session handoff with 200/503/422 responses, network-down queue retention, and a backoff-skipping flush. The harness intercepts `/api/overwolf/session`, so no request reaches production.
 
 To point the harness at a local BGMS server instead of the interceptor, set `window.bgmsDevEndpoint` before the harness scripts load. Overwolf runtime never defines it, so the packaged app always uses the production endpoint.
+
+## 0.5.1 regression checks (2026-09-07)
+
+The controller tests reproduce focus-update storms, 50ms subscriber batching without event loss, no idle queue timers, a 15-second stalled-request timeout, due-time retries, queue draining after rejection, opt-out cancellation, and stale GEP callbacks. UI tests verify unchanged text writes, hidden diagnostics, reopening with fresh data and hotkey listener cleanup. These are mocked checks; they do not confirm new real-game payload observations. See [Windows test guide](windows-test-guide.md) for the required desktop/live checks and [release evidence](release-readiness.md) for operation counts.
 
 ## Phase 0 Manual Checks
 

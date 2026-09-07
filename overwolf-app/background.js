@@ -38,7 +38,8 @@
     discord: "https://discord.gg/T97MR78awb"
   };
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
-  var QUEUE_TICK_MS = 30000;
+  var SESSION_REQUEST_TIMEOUT_MS = 15000;
+  var STATE_NOTIFY_DELAY_MS = 50;
 
   var REQUIRED_FEATURES = gepState.REQUIRED_FEATURES;
   var MAX_FEATURE_ATTEMPTS = 8;
@@ -66,14 +67,21 @@
   var snapshotTimer = null;
   var queueTimer = null;
   var queueFlushInFlight = false;
+  var notificationTimer = null;
+  var featureRetryTimer = null;
+  var infoUpdateRevision = 0;
 
   var state = gepState.createInitialState();
 
   var infoUpdatesListener = function (event) {
+    if (!pubgRunning) return;
+    infoUpdateRevision += 1;
     setState(gepState.reduceInfoUpdatesEvent(state, event));
   };
 
   var newEventsListener = function (event) {
+    if (!pubgRunning) return;
+    infoUpdateRevision += 1;
     var nextState = gepState.reduceNewEventsEvent(state, event);
 
     setState(nextState);
@@ -84,6 +92,7 @@
   };
 
   var gepErrorListener = function (event) {
+    if (!pubgRunning) return;
     setState(gepState.reduceGepError(state, event));
   };
 
@@ -100,6 +109,8 @@
   }
 
   function notifySubscribers() {
+    notificationTimer = null;
+    if (!subscribers.length) return;
     var snapshot = cloneState();
 
     subscribers = subscribers.filter(function (callback) {
@@ -116,7 +127,10 @@
     var wasDegraded = gepState.isServiceDegraded(state);
 
     state = nextState;
-    notifySubscribers();
+    // 수집과 요약은 즉시 처리하고 화면 전달만 합쳐 직렬화와 DOM 작업을 줄인다.
+    if (subscribers.length && notificationTimer === null) {
+      notificationTimer = window.setTimeout(notifySubscribers, STATE_NOTIFY_DELAY_MS);
+    }
 
     // 경고 라인이 새로 뜨거나 사라지면 mini 오버레이 높이를 맞춘다.
     if (overlayVisible && gepState.isServiceDegraded(state) !== wasDegraded) {
@@ -125,9 +139,11 @@
   }
 
   function patchState(partial) {
-    var nextState = JSON.parse(JSON.stringify(state));
+    var keys = Object.keys(partial);
+    if (!keys.some(function (key) { return state[key] !== partial[key]; })) return;
+    var nextState = Object.assign({}, state);
 
-    Object.keys(partial).forEach(function (key) {
+    keys.forEach(function (key) {
       nextState[key] = partial[key];
     });
 
@@ -165,6 +181,7 @@
   }
 
   function setOverlayVisible(nextVisible) {
+    if (overlayVisible === nextVisible) return;
     overlayVisible = nextVisible;
 
     if (overlayVisible) {
@@ -180,6 +197,12 @@
     var classId = gepState.resolveClassId(gameInfo);
 
     if (gepState.isPubgGameInfo(gameInfo)) {
+      var isNewGame = !pubgRunning || !lastGameInfo || lastGameInfo.id !== gameInfo.id;
+      var previousWidth = getGameWidth();
+      if (isNewGame && pubgRunning) {
+        resetGepRuntimeState(null, null, false);
+        setOverlayVisible(false);
+      }
       pubgRunning = true;
       lastGameInfo = gameInfo;
       patchState({
@@ -187,11 +210,18 @@
         detectedClassId: classId,
         detectedGameRunning: true
       });
-      fetchServiceStatus(classId);
-      ensureGepSubscription();
-      setOverlayVisible(true);
+      if (isNewGame) {
+        fetchServiceStatus(classId);
+        ensureGepSubscription();
+        setOverlayVisible(true);
+      } else if (overlayVisible && previousWidth !== getGameWidth()) {
+        applyOverlaySettings();
+      }
       return;
     }
+
+    if (!pubgRunning && state.detectedGameId === (gameInfo ? gameInfo.id || null : null)
+      && state.detectedGameRunning === Boolean(gameInfo && gameInfo.isRunning)) return;
 
     if (gameInfo) {
       lastGameInfo = gameInfo;
@@ -206,6 +236,10 @@
     gepAttemptToken += 1;
     requiredFeaturesActive = false;
     requiredFeaturesInFlight = false;
+    if (featureRetryTimer !== null) {
+      window.clearTimeout(featureRetryTimer);
+      featureRetryTimer = null;
+    }
 
     if (snapshotTimer) {
       window.clearTimeout(snapshotTimer);
@@ -221,6 +255,8 @@
       gepStatus: "idle",
       lastEvent: "Waiting for PUBG"
     }));
+    patchState({ handoffEnabled: settingsStore.read().handoffEnabled });
+    publishQueueState(readQueue());
   }
 
   function openDesktopWindow() {
@@ -357,7 +393,9 @@
     });
 
     overwolf.games.onGameInfoUpdated.addListener(function (event) {
-      handleGameInfo(event && event.gameInfo);
+      if (event && Object.prototype.hasOwnProperty.call(event, "gameInfo")) {
+        handleGameInfo(event.gameInfo);
+      }
     });
   }
 
@@ -405,7 +443,6 @@
 
   function setRequiredFeatures(attempt, token) {
     if (!pubgRunning || token !== gepAttemptToken) {
-      requiredFeaturesInFlight = false;
       return;
     }
 
@@ -420,8 +457,6 @@
       var succeeded = Boolean(result && (result.success === true || result.status === "success")) && supported.length > 0;
 
       if (!pubgRunning || token !== gepAttemptToken) {
-        requiredFeaturesActive = false;
-        requiredFeaturesInFlight = false;
         return;
       }
 
@@ -451,7 +486,8 @@
         return;
       }
 
-      window.setTimeout(function () {
+      featureRetryTimer = window.setTimeout(function () {
+        featureRetryTimer = null;
         setRequiredFeatures(attempt + 1, token);
       }, RETRY_DELAY_MS);
     });
@@ -462,7 +498,9 @@
    * 공식 GetInfoResult는 res에 담기지만 클라이언트 버전에 따라 info로 오는 경우도 있어 둘 다 처리한다.
    */
   function refreshGepInfoSnapshot() {
-    if (!hasGepApi() || typeof overwolf.games.events.getInfo !== "function") {
+    var token = gepAttemptToken;
+    var revision = infoUpdateRevision;
+    if (!pubgRunning || !hasGepApi() || typeof overwolf.games.events.getInfo !== "function") {
       return;
     }
 
@@ -470,7 +508,7 @@
       var succeeded = Boolean(result && (result.success === true || result.status === "success"));
       var payloads;
 
-      if (!succeeded) {
+      if (!succeeded || !pubgRunning || token !== gepAttemptToken || revision !== infoUpdateRevision) {
         return;
       }
 
@@ -493,6 +531,7 @@
    * 실패하면 조용히 무시한다(진단 보조 기능이므로 앱 동작을 막지 않는다).
    */
   function fetchServiceStatus(classId) {
+    var token = gepAttemptToken;
     var gameId = classId || gepState.PUBG_CLASS_IDS[0];
     var url = STATUS_ENDPOINT_TEMPLATE.replace("{gameId}", String(gameId));
 
@@ -509,7 +548,7 @@
 
       return response.json();
     }).then(function (payload) {
-      if (!payload) {
+      if (!payload || token !== gepAttemptToken) {
         return;
       }
 
@@ -527,34 +566,6 @@
     overwolf.extensions.current.getManifest(function (manifest) {
       if (manifest && manifest.meta && manifest.meta.version) {
         appVersion = String(manifest.meta.version);
-      }
-    });
-  }
-
-  /*
-   * Overwolf 클라이언트 언어를 참고해 기본 언어를 정한다.
-   * 공식 API: overwolf.settings.language.get(callback) -> {language: "en", success: true}
-   * 사용자가 앱에서 언어를 직접 고른 적이 있으면 그 선택을 덮어쓰지 않는다.
-   * 기본값은 영어이고 한국어는 optional localization이다.
-   */
-  function applyClientLanguage() {
-    if (!hasBaseOverwolfApi() || !overwolf.settings || !overwolf.settings.language) {
-      return;
-    }
-
-    if (!window.bgmsI18n || typeof window.bgmsI18n.hasStoredLanguage !== "function") {
-      return;
-    }
-
-    if (window.bgmsI18n.hasStoredLanguage()) {
-      return;
-    }
-
-    overwolf.settings.language.get(function (result) {
-      var language = result && result.language ? String(result.language).toLowerCase() : "";
-
-      if (language.indexOf("ko") === 0) {
-        window.bgmsI18n.setLanguage("ko");
       }
     });
   }
@@ -636,6 +647,10 @@
   }
 
   function flushSessionQueue() {
+    if (queueTimer !== null) {
+      window.clearTimeout(queueTimer);
+      queueTimer = null;
+    }
     var settings = settingsStore.read();
     var queue = readQueue();
     var entry;
@@ -654,29 +669,46 @@
 
     if (!entry) {
       publishQueueState(queue);
+      scheduleQueueRetry(queue);
       return;
     }
 
     queueFlushInFlight = true;
 
-    window.fetch(SESSION_ENDPOINT, {
+    // 응답이 끝나지 않아도 큐를 잠그지 않는다. 늦은 성공/실패는 한 번만 처리한다.
+    var settled = false;
+    var abortController = window.AbortController ? new window.AbortController() : null;
+    var timeout = window.setTimeout(function () {
+      finish({ ok: false, status: 0 });
+      if (abortController) abortController.abort();
+    }, SESSION_REQUEST_TIMEOUT_MS);
+
+    function finish(result) {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      settleQueueEntry(entry.payload.session_id, result);
+    }
+
+    var request = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-BGMS-Session-Id": entry.payload.session_id
       },
       body: JSON.stringify(entry.payload)
-    }).then(function (response) {
-      settleQueueEntry(entry.payload.session_id, {
-        ok: response.ok,
-        status: response.status
+    };
+    if (abortController) request.signal = abortController.signal;
+
+    try {
+      window.fetch(SESSION_ENDPOINT, request).then(function (response) {
+        finish({ ok: response.ok, status: response.status });
+      }).catch(function () {
+        finish({ ok: false, status: 0 });
       });
-    }).catch(function () {
-      settleQueueEntry(entry.payload.session_id, {
-        ok: false,
-        status: 0
-      });
-    });
+    } catch (_error) {
+      finish({ ok: false, status: 0 });
+    }
   }
 
   function settleQueueEntry(sessionId, result) {
@@ -696,17 +728,20 @@
     });
     publishQueueState(queue, applied.outcome);
 
-    if (applied.outcome === "sent" && sessionQueue.pickDueEntry(queue)) {
-      flushSessionQueue();
-    }
+    scheduleQueueRetry(queue);
   }
 
-  function startQueueTimer() {
-    if (queueTimer) {
-      return;
+  function scheduleQueueRetry(queue) {
+    if (queueTimer !== null) {
+      window.clearTimeout(queueTimer);
+      queueTimer = null;
     }
+    if (queueFlushInFlight || !queue.length || !settingsStore.canSendHandoff(settingsStore.read())) return;
 
-    queueTimer = window.setInterval(flushSessionQueue, QUEUE_TICK_MS);
+    // 가장 먼저 재시도 가능한 시각에만 깨운다. 빈 큐와 동의 해제 상태에서는 쉬도록 한다.
+    var nextAttemptAt = Math.min.apply(null, queue.map(function (entry) { return entry.nextAttemptAt; }));
+    var delay = Math.min(2147483647, Math.max(0, nextAttemptAt - Date.now()));
+    queueTimer = window.setTimeout(flushSessionQueue, delay);
   }
 
   function subscribe(callback) {
@@ -720,6 +755,10 @@
       subscribers = subscribers.filter(function (subscriber) {
         return subscriber !== callback;
       });
+      if (!subscribers.length && notificationTimer !== null) {
+        window.clearTimeout(notificationTimer);
+        notificationTimer = null;
+      }
     };
   }
 
@@ -742,23 +781,20 @@
         var assigned = {};
         var list;
 
-        if (!result || !result.success || !result.games) {
+        if (!result || !result.success) {
           callback(null);
           return;
         }
 
-        // games 는 class id 별 배열이다. PUBG(10906) 항목을 우선 보고, 없으면 전체를 훑는다.
-        list = result.games[String(gepState.PUBG_CLASS_IDS[0])] || [];
-
-        if (!list.length) {
-          Object.keys(result.games).forEach(function (key) {
-            list = list.concat(result.games[key] || []);
-          });
-        }
+        // 전역 바인딩을 먼저 읽고 PUBG의 명시적 설정(해제 포함)으로 덮어쓴다.
+        list = (Array.isArray(result.globals) ? result.globals : []).concat(
+          result.games && Array.isArray(result.games[String(gepState.PUBG_CLASS_IDS[0])])
+            ? result.games[String(gepState.PUBG_CLASS_IDS[0])] : []
+        );
 
         list.forEach(function (hotkey) {
           if (hotkey && hotkey.name) {
-            assigned[hotkey.name] = hotkey.binding || "";
+            assigned[hotkey.name] = hotkey.IsUnassigned ? "" : hotkey.binding || "";
           }
         });
 
@@ -843,6 +879,7 @@
     },
     retryHandoff: flushSessionQueue,
     refreshDiagnostics: function () {
+      ensureGepSubscription();
       refreshGepInfoSnapshot();
       fetchServiceStatus(state.detectedClassId);
       flushSessionQueue();
@@ -855,7 +892,6 @@
 
   getCurrentWindow(function () {
     readAppVersion();
-    applyClientLanguage();
     registerHotkey();
     registerGameListeners();
     // 이전 실행에서 전송하지 못한 요약이 있으면 이어서 처리한다.
@@ -864,6 +900,5 @@
     });
     publishQueueState(readQueue());
     flushSessionQueue();
-    startQueueTimer();
   });
 })();

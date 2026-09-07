@@ -2,7 +2,9 @@
 
 This folder contains the Overwolf app for BGMS review and Overwolf submission preparation. Phases 1, 1.5, 2, and the first step of Phase 3 are implemented. The client, the BGMS receiving and reading endpoints, the database schema, and the web session view are all in place.
 
-## Release Readiness (2026-08-01)
+## Release Readiness (2026-09-07)
+
+Version 0.5.1 is prepared for Windows testing. See [current progress and performance evidence](docs/release-readiness.md) and [Windows setup](docs/windows-test-guide.md). The production backend results below are historical August checks, not a new server verification.
 
 Done and verified:
 
@@ -13,7 +15,7 @@ Done and verified:
 - Map replay entry is deployed and verified in production. Opening a session's `7:00` engagement lands the replay at slider `420000`ms of `1667712`ms, showing `ELAPSED 07:00`, `ALIVE 69`, and the shrinking blue zone. The UUID is extracted from the GEP `match_id`, so no new data source was needed.
 - The page renders at 1280 and 390 px with no horizontal overflow.
 - 90-day retention is wired into the daily cleanup job in the BGMS repository.
-- 66 app tests, 43 server tests, 8 migration DB scenarios pass.
+- The app baseline had 69 passing tests; 0.5.1 adds runtime and UI regression coverage. Historical server checks: 43 tests and 8 migration DB scenarios. Run `npm run verify` for current client checks.
 
 Not done, required before a public listing:
 
@@ -54,7 +56,7 @@ Deliberately deferred (needs separate approval):
 After a match ends, BGMS Companion can send one compact session summary to BGMS.
 
 - Off by default. The user must enable it in the desktop window and enter a BGMS nickname.
-- The summary is queued in local storage first, then posted. A failed post is retried with exponential backoff (5s, 15s, 60s, 5m, 15m) and survives an app restart.
+- The summary is queued in local storage first, then posted. A failed post is retried with exponential backoff (5s, 15s, 60s, 5m; five total attempts) and survives an app restart.
 - `4xx` responses other than `429` are treated as permanent rejections and dropped without retrying.
 - The server (`app/api/overwolf/session` in the BGMS repository) is idempotent on `session_id`, so duplicate `matchEnd` events cannot create duplicate rows.
 - The payload carries counters, phase, match identifiers, GEP version, and the user-provided nickname/platform. No damage, location, or team-location fields.
@@ -90,7 +92,7 @@ After a match ends, BGMS Companion can send one compact session summary to BGMS.
 npm test
 ```
 
-Runs `node --test --test-force-exit overwolf-app/tests/*.test.js`. No Overwolf client, no game, and no dependencies required. `background-controller.test.js` loads the dev-harness mock API in a `vm` context to verify controller wiring, including the handoff queue against intercepted session requests. `--test-force-exit` is required because the controller keeps a queue flush interval alive.
+Runs `node --test --test-force-exit overwolf-app/tests/*.test.js`. No Overwolf client, no game, and no dependencies required. `background-controller.test.js` loads the dev-harness mock API in a `vm` context to verify controller wiring, including the handoff queue against intercepted session requests. `--test-force-exit` prevents pending snapshot/retry timers in the VM fixtures from keeping the test runner alive. The app no longer polls an empty queue.
 
 ## Local Preview
 
@@ -100,7 +102,7 @@ Runs `node --test --test-force-exit overwolf-app/tests/*.test.js`. No Overwolf c
 
 ## OPK Packaging
 
-When building an `.opk` for Windows testing, compress the contents of `overwolf-app/` so `manifest.json` is at the root of the archive. Do not zip the parent folder as an extra top-level directory.
+Run `npm run verify` from the repository root and load `dist/bgms-companion` as an unpacked app in Overwolf. This staging folder excludes tests, harnesses, docs and store screenshots. It is not a signed or validated OPK. Use the Windows developer packaging workflow for an OPK and verify that `manifest.json` is at its root. See [Windows testing](docs/windows-test-guide.md).
 
 ## Controller Notes
 
@@ -124,7 +126,7 @@ The desktop window shows GEP status, Overwolf event service status (from `https:
 
 ## Localization
 
-English is the default app language for Overwolf review. Korean is available as an optional local setting from the desktop window and is stored locally in `localStorage`. If the user has never chosen a language and the Overwolf client language is Korean, Korean is applied once as the initial default.
+English is the default app language for Overwolf review. Korean is available as an optional local setting from the desktop window and is stored locally in `localStorage`. New installations stay in English until the user explicitly selects Korean. Existing saved choices are preserved.
 
 ## Overwolf Review Notes
 

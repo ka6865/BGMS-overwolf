@@ -99,7 +99,7 @@
       window.mockGep.fireBulkInfoUpdate({ game_info: { location: JSON.stringify({ x: 2300, y: 5740, z: 1520 }) } }, "location");
     },
 
-    // 9. rank/map 같은 Phase 1 미사용 feature 주입. me/health를 오염시키지 않아야 한다.
+    // 9. rank/map feature 분기 검증. 순위/맵만 반영하고 me/health를 오염시키지 않아야 한다.
     injectUnusedFeatures: function () {
       console.log("Scenario: rank.me must not overwrite me.health.");
       window.mockGep.fireBulkInfoUpdate({ match_info: { me: "38", total: "98" } }, "rank");

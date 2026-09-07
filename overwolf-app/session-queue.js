@@ -123,13 +123,13 @@
    * 전송 결과를 큐에 반영한다.
    * result: {ok, status}
    *  - ok true         -> 제거
-   *  - 4xx (429 제외)  -> 서버가 거부한 payload이므로 재시도하지 않고 제거
-   *  - 그 외           -> 백오프 후 재시도, MAX_ATTEMPTS 초과 시 제거
+   *  - 0/429/5xx       -> 백오프 후 재시도, MAX_ATTEMPTS 도달 시 제거
+   *  - 그 외           -> 재시도하지 않고 제거
    */
   function applyResult(queue, sessionId, result, currentTime) {
     var timestamp = typeof currentTime === "number" ? currentTime : now();
     var status = result && typeof result.status === "number" ? result.status : 0;
-    var isPermanentReject = status >= 400 && status < 500 && status !== 429;
+    var isRetryable = status === 0 || status === 429 || (status >= 500 && status < 600);
 
     if (result && result.ok) {
       return {
@@ -138,7 +138,7 @@
       };
     }
 
-    if (isPermanentReject) {
+    if (!isRetryable) {
       return {
         queue: removeEntry(queue, sessionId),
         outcome: "rejected"
@@ -191,10 +191,13 @@
       };
     }
 
+    var earliest = normalized.reduce(function (selected, entry) {
+      return entry.nextAttemptAt < selected.nextAttemptAt ? entry : selected;
+    });
     return {
       pending: normalized.length,
-      nextAttemptAt: normalized[0].nextAttemptAt || null,
-      lastError: normalized[0].lastError
+      nextAttemptAt: earliest.nextAttemptAt || null,
+      lastError: earliest.lastError
     };
   }
 
