@@ -4,6 +4,8 @@
 
 **최근 확인일: 2026-09-07 (게임 정보 갱신, 개발 환경, 핫키 기준 재확인)**
 
+**추가 설계 확인: 2026-09-08 (사망 복기의 시간축·경기 종료 기준, 문서 하단)**
+
 ## 기준 문서
 
 - Overwolf Real-time Game Events intro: https://dev.overwolf.com/ow-native/live-game-data-gep/live-game-data-gep-intro/
@@ -457,3 +459,20 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 세션 POST는 15초에 타임아웃 처리하고 지원 런타임에서는 `AbortController`로 중단한다. 지원하지 않아도 큐 잠금은 해제되며 늦은 응답은 중복 반영하지 않는다. 재시도는 네트워크 오류/429/5xx만 허용한다.
 - 게임 종료/교체 전의 구독 응답과 snapshot은 현재 상태를 덮어쓰지 않는다. snapshot 요청 뒤 새 라이브 데이터가 수신되었으면 오래된 snapshot도 적용하지 않는다.
 - GEP feature/key/value 파서는 변경하지 않았다. 실게임 수신 여부와 FPS/CPU 효과는 [Windows 절차](windows-test-guide.md)에 따라 별도로 기록해야 한다.
+
+## 사망 복기 구현 준비 기준 (2026-09-08)
+
+공식 자료 재확인:
+
+- [Overwolf PUBG GEP](https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/playerunknowns-battlegrounds/)는 `matchEnd`가 본인 사망과 로비 복귀에 발생할 수 있다고 설명한다. 따라서 경기 전체 종료 보장으로 사용하지 않는다. `pseudo_match_id`도 공식 `match_id`와 별개다.
+- [PUBG Telemetry](https://documentation.pubg.com/en/telemetry.html)는 공식 match의 asset을 통해 telemetry를 조회하는 경로를 설명한다. 새 앱 직접 호출 경로를 만들라는 의미가 아니며 BGMS 기존 웹 조회 경로를 유지한다.
+- [PUBG Telemetry Events](https://documentation.pubg.com/en/telemetry-events.html)는 `LogMatchEnd`, `LogPlayerKillV2`의 victim, 재배치 이벤트를 정의한다. 공식 원문 스키마와 BGMS가 변환해 웹에 전달하는 스키마는 구분한다.
+
+코드 관찰이며 실게임 관측값은 아님:
+
+- 앱의 `event_timeline.t`는 `Date.now() - matchStartedAt` 기반이다. GEP matchStart 수신과 공식 텔레메트리 시간축의 정렬은 아직 검증되지 않았다.
+- 앱 타임라인은 앞선 40개만 보관하며 첫 matchEnd에서 요약을 만든다. 후속 콜백의 death/순위를 이전 요약에 포함한다고 보장할 수 없다.
+- 웹 원격 main `9884f5b` 리플레이는 변환된 `kill`/`victim`/`relativeTimeMs`를 사용해 플레이어 사망 목록을 만든다. M1은 공식 목록에서 복기 구간을 고르도록 설계한다.
+- 변환 payload의 이벤트 존재나 HTTP 200만으로 경기 전체 종료를 입증하지 않는다. 기존 서버 경로의 종료 보장은 실행 계획 Task 1의 확인 대상이다.
+
+새 GEP API·권한·payload 필드는 이번 준비에서 추가하지 않았다. [설계](../../docs/superpowers/specs/2026-09-08-death-review-design.md)에 구현 경계와 검증 조건을 기록한다.
