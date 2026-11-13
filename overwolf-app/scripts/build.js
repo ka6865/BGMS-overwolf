@@ -9,6 +9,7 @@ const APP_ROOT = path.join(PROJECT_ROOT, "overwolf-app");
 const OUTPUT_ROOT = path.join(PROJECT_ROOT, "dist", "bgms-companion");
 const RUNTIME_FILES = [
   "manifest.json",
+  "ads.js",
   "background.html",
   "background.js",
   "desktop.html",

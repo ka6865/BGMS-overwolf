@@ -640,3 +640,18 @@ test("matchStart: 타임라인과 순위는 초기화하되 맵 이름은 유지
   assert.equal(state.headshots, 0);
   assert.equal(state.mapName, "Miramar_Main");
 });
+
+test("bookmark: 진행 중인 매치에서만 받고 매치당 상한을 지킨다", () => {
+  assert.equal(gep.reduceBookmark(baseState()).eventTimeline.length, 0);
+
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+  for (let i = 0; i < gep.MAX_BOOKMARKS + 3; i += 1) {
+    state = gep.reduceBookmark(state);
+  }
+
+  assert.equal(state.eventTimeline.filter((entry) => entry.kind === "bookmark").length, gep.MAX_BOOKMARKS);
+  assert.equal(state.lastEvent, "Moment bookmarked");
+
+  state = gep.reduceGameEvent(state, "matchEnd", "");
+  assert.equal(gep.reduceBookmark(state), state);
+});

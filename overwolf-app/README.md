@@ -83,6 +83,7 @@ After a match ends, BGMS Companion can send one compact session summary to BGMS.
 | `in-game.js` / `in-game.html` | Compact HUD renderer |
 | `desktop.js` / `desktop.html` | Settings and live diagnostics window |
 | `i18n.js` | English default dictionary plus optional Korean |
+| `ads.js` | Overwolf Ads SDK loader for the single 400x300 desktop-window ad container |
 | `dev-harness/` | Browser harness with a mock Overwolf API and official-shaped GEP scenarios |
 | `tests/` | `node --test` suites for the reducer and the background wiring |
 

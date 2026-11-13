@@ -376,3 +376,71 @@ test("desktop shows an explicit unassigned hotkey without hiding it behind the m
   ui.hotkeyHub.emit();
   assert.equal(ui.document.elements["hotkey-toggle-overlay"].textContent, "Ctrl+Shift+B");
 });
+
+function createAdsSandbox() {
+  const appended = [];
+  const stateListeners = [];
+  const created = [];
+  const container = createElement();
+  const sandbox = {
+    console: { warn: function () {} },
+    document: {
+      head: { appendChild: function (node) { appended.push(node); } },
+      createElement: function () { return {}; },
+      getElementById: function (id) { return id === "bgms-ad-desktop" ? container : null; }
+    },
+    overwolf: { windows: { onStateChanged: { addListener: function (listener) { stateListeners.push(listener); } } } }
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  loadScript(sandbox, "ads.js");
+  return {
+    sandbox: sandbox,
+    appended: appended,
+    created: created,
+    container: container,
+    installSdk: function () {
+      sandbox.OwAd = function (element, settings) {
+        const instance = { element: element, settings: settings, shutdowns: 0, shutdown: function () { instance.shutdowns++; } };
+        created.push(instance);
+        return instance;
+      };
+    },
+    setWindowState: function (state, name) {
+      stateListeners.forEach(function (listener) { listener({ window_name: name || "desktop", window_state: state }); });
+    }
+  };
+}
+
+test("ads load the official SDK asynchronously and create one 400x300 container", () => {
+  const ads = createAdsSandbox();
+  assert.equal(ads.appended.length, 1);
+  assert.equal(ads.appended[0].src, "https://content.overwolf.com/libs/ads/latest/owads.min.js");
+  assert.equal(ads.appended[0].async, true);
+  ads.installSdk();
+  ads.appended[0].onload();
+  assert.equal(ads.created.length, 1);
+  assert.equal(ads.created[0].element, ads.container);
+  assert.deepEqual(JSON.parse(JSON.stringify(ads.created[0].settings)), { size: { width: 400, height: 300 }, containerId: "bgms_400x300_dt" });
+  assert.ok(ads.created[0].settings.containerId.length <= 20);
+});
+
+test("ads stop while the desktop window is minimized and restart once on restore", () => {
+  const ads = createAdsSandbox();
+  ads.installSdk();
+  ads.appended[0].onload();
+  ads.setWindowState("minimized", "in_game");
+  assert.equal(ads.created[0].shutdowns, 0);
+  ads.setWindowState("minimized");
+  assert.equal(ads.created[0].shutdowns, 1);
+  ads.setWindowState("normal");
+  ads.setWindowState("normal");
+  assert.equal(ads.created.length, 2);
+});
+
+test("ads fail quietly when the SDK cannot load", () => {
+  const ads = createAdsSandbox();
+  ads.appended[0].onerror();
+  ads.setWindowState("normal");
+  assert.equal(ads.created.length, 0);
+});

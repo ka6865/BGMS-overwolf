@@ -897,6 +897,25 @@
     }, state);
   }
 
+  // 매치당 사용자 북마크 상한. 타임라인 40개 상한 안에서 자동 이벤트 자리를 남긴다.
+  var MAX_BOOKMARKS = 10;
+
+  /*
+   * 사용자가 핫키로 남긴 "나중에 볼 순간". 진행 중인 매치에서만 받고, 시각만 남긴다.
+   * 시각은 로컬 시계 기준이라 웹은 대략적인 시점으로만 다룬다.
+   */
+  function reduceBookmark(state) {
+    var count = state.eventTimeline.filter(function (entry) { return entry.kind === "bookmark"; }).length;
+
+    if (!state.matchStartedAt || state.matchEnded || count >= MAX_BOOKMARKS) {
+      return state;
+    }
+
+    return appendTimeline(patch(state, {
+      lastEvent: "Moment bookmarked"
+    }), "bookmark");
+  }
+
   /*
    * matchEnd를 받았지만 요약을 아직 보내지 않은 상태. 확정은 로비 복귀(applyPhase)나
    * background 의 유예 타이머·다음 matchStart·게임 종료가 맡는다.
@@ -1124,6 +1143,8 @@
     isServiceDegraded: isServiceDegraded,
     buildSessionSummary: buildSessionSummary,
     isSummaryPending: isSummaryPending,
+    reduceBookmark: reduceBookmark,
+    MAX_BOOKMARKS: MAX_BOOKMARKS,
     safeParse: safeParse,
     summarizeValue: summarizeValue
   };

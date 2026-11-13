@@ -742,3 +742,18 @@ test("매치 마감: 게임이 꺼지면 끝난 매치 요약을 확정하고 �
   assert.equal(sandbox.mockGep.sessionRequests().length, 1);
   assert.equal(clock.pending(), 0);
 });
+
+test("북마크 핫키는 진행 중인 매치 타임라인에 기록되고 요약으로 전송된다", async () => {
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    sessionStatus: 200
+  });
+  sandbox.mockGep.triggerHotkey("mark_moment");
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.triggerHotkey("mark_moment");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const requests = sandbox.mockGep.sessionRequests().map((body) => JSON.parse(body));
+  assert.deepEqual(requests[0].event_timeline.map((entry) => entry.kind), ["bookmark"]);
+});

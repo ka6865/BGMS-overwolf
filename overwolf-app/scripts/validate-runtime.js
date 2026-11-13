@@ -5,7 +5,8 @@ const path = require("node:path");
 const { spawnSync } = require("node:child_process");
 
 const APP_ROOT = path.resolve(__dirname, "..");
-const EXPECTED_PERMISSIONS = ["GameInfo", "GameEvents", "Hotkeys"];
+// Extensions/Streaming/Profile 은 Overwolf Ads SDK 가 요구하는 권한이다(2026-11-13 광고 도입 승인).
+const EXPECTED_PERMISSIONS = ["GameInfo", "GameEvents", "Hotkeys", "Extensions", "Streaming", "Profile"];
 const EXPECTED_FEATURES = [
   "match",
   "match_info",

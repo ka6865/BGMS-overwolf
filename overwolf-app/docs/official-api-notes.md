@@ -477,3 +477,20 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 변환 payload의 이벤트 존재나 HTTP 200만으로 경기 전체 종료를 입증하지 않는다. 기존 서버 경로의 종료 보장은 실행 계획 Task 1의 확인 대상이다.
 
 새 GEP API·권한·payload 필드는 이번 준비에서 추가하지 않았다. [설계](../../docs/superpowers/specs/2026-09-08-death-review-design.md)에 구현 경계와 검증 조건을 기록한다.
+
+## 광고와 재설계 기준 (2026-11-13)
+
+공식 문서에서 확인한 사실:
+
+- 2026-11-01부터 Overwolf 광고, Tebex 구독, 또는 둘 다를 붙인 앱만 승인한다. 외부 수익화와 개인용 비공개 앱은 승인하지 않는다(https://dev.overwolf.com/ow-native/monetization/overview).
+- Ads SDK는 `https://content.overwolf.com/libs/ads/latest/owads.min.js`를 async로 불러오고 `new OwAd(container, { size: { width: 400, height: 300 }, containerId })`로 만든다. `containerId`는 20자 이하. 정리는 `shutdown()`. 이벤트 리스너는 deprecated다(https://dev.overwolf.com/ow-native/reference/ads/owad).
+- Ads SDK는 manifest 권한 `Extensions`, `Streaming`, `Profile`, `GameInfo`를 요구한다.
+- 광고 컨테이너의 부모는 `background: transparent`, 컨테이너에는 SDK가 만든 요소 외 자식이 없어야 하고 항상 보여야 한다. 창당 영상 광고 컨테이너는 1개.
+- 광고를 두면 안 되는 곳: 로그인/가입 창, 오류/알림 창, 광고만 있는 창, **앱 설정 페이지**(https://dev.overwolf.com/ow-native/monetization/advertising/standard-ads/working-with-ads).
+
+구현 선택:
+
+- `ads.js`가 데스크탑 창에만 400x300 컨테이너 하나(`bgms_400x300_dt`)를 만든다. 인게임 HUD에는 광고가 없다. 창이 최소화되면 `shutdown()`, 복원되면 다시 만든다. SDK 로드 실패 시 빈 칸만 남고 기능은 그대로다.
+- 데스크탑 창의 주 화면은 최근 매치 카드다. 설정은 접힘 영역(`settings-disclosure`)으로 옮겼고, 설정이 끝나지 않았을 때만 자동으로 펼친다. 설정 화면이 열린 상태에서 광고가 함께 보이는 것을 Overwolf QA가 문제 삼을 수 있으므로 심사 피드백을 확인한다.
+- 모든 기능은 광고와 무관하게 무료다(PUBG API Exclusive Access 금지). 광고 제거 구독은 아직 구현하지 않았다.
+- 북마크 핫키 `mark_moment`(기본 `Ctrl+Shift+M`)는 진행 중 매치에서만, 매치당 10개까지 타임라인에 `bookmark`를 남긴다. 서버는 모르는 kind를 422 없이 버리므로, 웹 저장소에서 `bookmark` 허용이 배포되기 전까지는 전송돼도 저장되지 않는다.

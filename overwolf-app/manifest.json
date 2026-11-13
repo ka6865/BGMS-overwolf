@@ -16,7 +16,10 @@
   "permissions": [
     "GameInfo",
     "GameEvents",
-    "Hotkeys"
+    "Hotkeys",
+    "Extensions",
+    "Streaming",
+    "Profile"
   ],
   "data": {
     "start_window": "background",
@@ -106,6 +109,11 @@
         "title": "Open BGMS desktop window",
         "action-type": "custom",
         "default": "Ctrl+Shift+G"
+      },
+      "mark_moment": {
+        "title": "Bookmark this moment for post-match review",
+        "action-type": "custom",
+        "default": "Ctrl+Shift+M"
       }
     }
   }

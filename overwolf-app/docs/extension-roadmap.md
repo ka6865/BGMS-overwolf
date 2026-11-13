@@ -435,3 +435,8 @@ Overwolf 앱 외에도 [Chicken Dinner](https://chickendinner.pubgmeta.com/), [P
 4. M1에는 새 앱 권한·GEP feature·DB migration·전송 형식 변경이 필요하지 않다. 거리 수치와 원인 추론도 제외해 기존 지도 표현부터 검증한다.
 
 상태: 설계·실행 계획 작성 완료, 운영 기능 미구현. 앱 기본 검증은 85개 테스트와 21개 실행 파일 빌드 통과. 웹 최신 코드 테스트와 Windows 실게임 검증은 후속 실행 항목이다. M2 북마크, M3 목표 추적, M4 스쿼드, M5 영상은 독립 단계로 유지한다.
+
+## 공식 정책 변경 확인 (2026-11-13)
+
+- **수익화 의무화**: 2026-11-01부터 Overwolf는 Overwolf 수익화를 붙인 앱만 승인한다. "All apps must integrate Overwolf ads, subscriptions powered by Tebex, or both." 외부 결제 서비스는 금지되고, 개인용 비공개 앱도 승인하지 않는다(https://dev.overwolf.com/ow-native/monetization/overview). Phase 7은 더 이상 "장기 검토"가 아니라 스토어 출시의 선행 조건이다. PUBG API Exclusive Access 금지 때문에 데이터 기능은 모두 무료로 두고, 광고 + 광고 제거 구독(Tebex) 구조가 유일하게 두 정책을 함께 만족한다. 도입은 별도 승인 후 진행한다.
+- **GEP 307 지원 중단(2026-06-16)**: PUBG `inventory`, `equipped`, `knockout`, `matchSummary`, `blue_zone`, `red_zone`, `safe_zone`, `time_to_next_circle`(https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/deprecated/overview). `me` feature의 `weaponState`(category `inventory`)는 2026-11-13 기준 공식 PUBG 페이지에 여전히 있으므로 유지한다. `knockedout` 수신 여부는 실게임에서 다시 확인한다.

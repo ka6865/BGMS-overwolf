@@ -412,6 +412,10 @@
       if (event && event.name === "open_desktop") {
         toggleDesktopWindow();
       }
+
+      if (event && event.name === "mark_moment" && pubgRunning) {
+        setState(gepState.reduceBookmark(state));
+      }
     });
   }
 
