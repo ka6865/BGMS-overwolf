@@ -146,7 +146,9 @@ test("핸드오프가 꺼져 있으면 matchEnd에서 큐에 넣지 않는다", 
 
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   const state = sandbox.bgmsController.getState();
 
@@ -163,6 +165,7 @@ test("동의를 켜도 닉네임이 없으면 전송하지 않는다", () => {
 
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   assert.deepEqual(sandbox.readStoredQueue(), []);
   assert.equal(sandbox.mockGep.sessionRequests().length, 0);
@@ -177,7 +180,9 @@ test("동의와 닉네임이 있으면 세션 요약을 한 번만 전송한다"
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("kill", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -203,6 +208,7 @@ test("전송 payload에는 정책 금지 필드가 없다", async () => {
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireBulkInfoUpdate({ me: { damage_dealt: "120" } }, "me");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -222,6 +228,7 @@ test("서버 오류는 큐에 남고 재시도 대상이 된다", async () => {
 
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -242,6 +249,7 @@ test("서버가 4xx로 거부하면 재시도하지 않고 큐를 비운다", as
 
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -258,6 +266,7 @@ test("네트워크 단절 시 요약은 큐에 보존된다", async () => {
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("kill", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
 
   await new Promise((resolve) => setTimeout(resolve, 10));
 
@@ -280,6 +289,7 @@ test("재시작 후 보존된 큐를 이어서 전송한다", async () => {
 
   failed.mockGep.fireEvent("matchStart", "");
   failed.mockGep.fireEvent("matchEnd", "");
+  failed.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
   await new Promise((resolve) => setTimeout(resolve, 10));
 
   const carriedQueue = failed.readStoredQueue();
@@ -575,6 +585,7 @@ test("15초 무응답 전송은 한 번 실패 처리하고 5초 뒤 재시도�
   });
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
   await clock.tick(15000);
   assert.equal(sandbox.readStoredQueue()[0].attempts, 1);
   assert.equal(sandbox.readStoredQueue()[0].nextAttemptAt, 120000);
@@ -620,6 +631,7 @@ test("전송 동의를 끄면 예약 재시도를 취소하고 다시 켜면 보
   });
   sandbox.mockGep.fireEvent("matchStart", "");
   sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireInfoUpdate("phase", "game_info", "phase", "lobby");
   await clock.tick(2000);
   sandbox.bgmsSettings.write({ handoffEnabled: false, playerName: "Player" });
   sandbox.bgmsController.applyServiceSettings({ handoffEnabled: false, playerName: "Player" });
@@ -677,4 +689,56 @@ test("Overwolf 언어가 한국어여도 앱이 사용자 언어 선택을 자�
     s.overwolf.settings.language.get = (callback) => callback({ success: true, language: "ko" });
   } });
   assert.equal(writes, 0);
+});
+
+test("매치 마감: 로비 신호가 없으면 20초 뒤 늦게 온 사망까지 담아 한 번 전송한다", async () => {
+  let clock;
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    sessionStatus: 200,
+    configure(s) { clock = installClock(s); }
+  });
+  await clock.tick(0);
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireEvent("death", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  await clock.tick(19999);
+  assert.equal(sandbox.mockGep.sessionRequests().length, 0);
+  await clock.tick(1);
+  const requests = sandbox.mockGep.sessionRequests().map((body) => JSON.parse(body));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].event_timeline.at(-1).kind, "death");
+});
+
+test("매치 마감: 다음 matchStart가 오면 직전 매치를 먼저 확정한다", async () => {
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    sessionStatus: 200
+  });
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("kill", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireEvent("matchStart", "");
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const requests = sandbox.mockGep.sessionRequests().map((body) => JSON.parse(body));
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].gep_summary.kills, 1);
+  assert.equal(sandbox.bgmsController.getState().kills, 0);
+});
+
+test("매치 마감: 게임이 꺼지면 끝난 매치 요약을 확정하고 타이머를 남기지 않는다", async () => {
+  let clock;
+  const sandbox = createSandbox({
+    settings: { handoffEnabled: true, playerName: "Player" },
+    sessionStatus: 200,
+    configure(s) { clock = installClock(s); }
+  });
+  await clock.tick(0);
+  sandbox.mockGep.fireEvent("matchStart", "");
+  sandbox.mockGep.fireEvent("matchEnd", "");
+  sandbox.mockGep.fireGameInfoUpdated({ ...runningPubg, isRunning: false });
+  await clock.tick(0);
+  assert.equal(sandbox.mockGep.sessionRequests().length, 1);
+  assert.equal(clock.pending(), 0);
 });

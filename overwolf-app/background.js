@@ -40,6 +40,8 @@
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
   var SESSION_REQUEST_TIMEOUT_MS = 15000;
   var STATE_NOTIFY_DELAY_MS = 50;
+  // 로비 복귀 신호가 오지 않을 때 matchEnd 뒤 요약을 확정하기까지 기다리는 시간.
+  var MATCH_CLOSE_GRACE_MS = 20000;
 
   var REQUIRED_FEATURES = gepState.REQUIRED_FEATURES;
   var MAX_FEATURE_ATTEMPTS = 8;
@@ -70,6 +72,7 @@
   var notificationTimer = null;
   var featureRetryTimer = null;
   var infoUpdateRevision = 0;
+  var matchCloseTimer = null;
 
   var state = gepState.createInitialState();
 
@@ -77,18 +80,22 @@
     if (!pubgRunning) return;
     infoUpdateRevision += 1;
     setState(gepState.reduceInfoUpdatesEvent(state, event));
+    settleMatchSummary();
   };
 
   var newEventsListener = function (event) {
     if (!pubgRunning) return;
     infoUpdateRevision += 1;
-    var nextState = gepState.reduceNewEventsEvent(state, event);
 
-    setState(nextState);
-
-    if (nextState.summaryReady && !nextState.summarySent) {
-      enqueueSessionSummary();
+    // 다음 matchStart 가 상태를 초기화하기 전에 직전 매치 요약을 확정한다.
+    if (event && Array.isArray(event.events) && event.events.some(function (entry) {
+      return entry && entry.name === "matchStart";
+    })) {
+      finalizeMatchSummary();
     }
+
+    setState(gepState.reduceNewEventsEvent(state, event));
+    settleMatchSummary();
   };
 
   var gepErrorListener = function (event) {
@@ -231,7 +238,32 @@
     setOverlayVisible(false);
   }
 
+  // 로비 복귀로 확정됐으면 바로 보내고, 아니면 유예 타이머로 확정을 예약한다.
+  function settleMatchSummary() {
+    if (state.summaryReady && !state.summarySent) {
+      finalizeMatchSummary();
+      return;
+    }
+
+    if (gepState.isSummaryPending(state) && matchCloseTimer === null) {
+      matchCloseTimer = window.setTimeout(finalizeMatchSummary, MATCH_CLOSE_GRACE_MS);
+    }
+  }
+
+  function finalizeMatchSummary() {
+    if (matchCloseTimer !== null) {
+      window.clearTimeout(matchCloseTimer);
+      matchCloseTimer = null;
+    }
+
+    if (gepState.isSummaryPending(state)) {
+      enqueueSessionSummary();
+    }
+  }
+
   function resetGepRuntimeState(detectedGameId, detectedClassId, detectedGameRunning) {
+    // 게임 종료나 전환으로 상태를 지우기 전에 끝난 매치 요약을 확정한다.
+    finalizeMatchSummary();
     pubgRunning = false;
     gepAttemptToken += 1;
     requiredFeaturesActive = false;
@@ -616,6 +648,8 @@
     if (!settingsStore.canSendHandoff(settings)) {
       patchState({
         summaryReady: false,
+        // 보내지 않기로 처리한 매치다. 유예 타이머가 다시 확정하지 않게 표시한다.
+        summarySent: true,
         handoffEnabled: settings.handoffEnabled,
         lastEvent: settings.handoffEnabled
           ? "Session summary skipped (BGMS nickname required)"

@@ -242,22 +242,34 @@ test("kill: info kills는 절대값, kill 이벤트는 증분으로 처리한다
   assert.equal(state.kills, 4);
 });
 
-test("matchEnd: 중복 수신 시 요약 대상은 첫 이벤트 한 번만이다", () => {
+test("matchEnd: 중복 수신해도 첫 종료 시각을 유지하고 요약은 로비 복귀에서 확정한다", () => {
   let state = gep.reduceGameEvent(baseState(), "matchStart", "");
 
   state = gep.reduceGameEvent(state, "matchEnd", "");
 
   assert.equal(state.matchEnded, true);
   assert.equal(state.matchEndCount, 1);
-  assert.equal(state.summaryReady, true);
+  assert.equal(state.summaryReady, false);
+  assert.equal(gep.isSummaryPending(state), true);
 
   const firstEndedAt = state.matchEndedAt;
 
   state = gep.reduceGameEvent(state, "matchEnd", "");
+  state = gep.reduceGameEvent(state, "death", "");
 
   assert.equal(state.matchEndCount, 2);
-  assert.equal(state.summaryReady, false);
   assert.equal(state.matchEndedAt, firstEndedAt);
+
+  state = gep.reduceInfoUpdatesEvent(state, { feature: "phase", info: { game_info: { phase: "lobby" } } });
+
+  assert.equal(state.summaryReady, true);
+  assert.equal(gep.buildSessionSummary(state, {}).event_timeline.at(-1).kind, "death");
+});
+
+test("phase: 매치 종료 전 로비는 요약을 확정하지 않는다", () => {
+  const state = gep.reduceInfoUpdatesEvent(baseState(), { feature: "phase", info: { game_info: { phase: "lobby" } } });
+
+  assert.equal(state.summaryReady, false);
 });
 
 test("matchStart: 카운터는 초기화하되 식별자와 진단은 유지하고 세션 id는 새로 발급한다", () => {
@@ -575,6 +587,32 @@ test("eventTimeline: 최대 항목 수를 넘으면 더 쌓지 않는다", () =>
   assert.equal(state.eventTimeline.length, gep.MAX_TIMELINE_ENTRIES);
   // 카운터 자체는 계속 증가한다. 타임라인 상한이 킬 집계를 막지 않는다.
   assert.equal(state.kills, gep.MAX_TIMELINE_ENTRIES + 15);
+});
+
+test("eventTimeline: 상한이 차도 사망은 가장 오래된 kill을 밀어내고 보관한다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  for (let i = 0; i < gep.MAX_TIMELINE_ENTRIES + 20; i += 1) {
+    state = gep.reduceGameEvent(state, "kill", "");
+  }
+  state = gep.reduceGameEvent(state, "knockedout", "");
+  state = gep.reduceGameEvent(state, "death", "");
+
+  const kinds = state.eventTimeline.map((entry) => entry.kind);
+  assert.equal(kinds.length, gep.MAX_TIMELINE_ENTRIES);
+  assert.deepEqual(kinds.slice(-2), ["knockedout", "death"]);
+  assert.equal(gep.buildSessionSummary(state, {}).event_timeline.at(-1).kind, "death");
+});
+
+test("eventTimeline: kill이 하나도 없이 상한이 차면 새 항목을 버린다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  for (let i = 0; i < gep.MAX_TIMELINE_ENTRIES + 3; i += 1) {
+    state = gep.reduceGameEvent(state, i % 2 ? "revived" : "knockedout", "");
+  }
+
+  assert.equal(state.eventTimeline.length, gep.MAX_TIMELINE_ENTRIES);
+  assert.equal(state.eventTimeline.at(-1).kind, "revived");
 });
 
 test("matchStart: 타임라인과 순위는 초기화하되 맵 이름은 유지한다", () => {
