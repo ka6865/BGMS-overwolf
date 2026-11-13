@@ -29,6 +29,8 @@
   var SESSION_ENDPOINT = window.bgmsDevEndpoint || "https://bgms.kr/api/overwolf/session";
   // 사용자가 데스크탑 창에서 세션 기록을 열 때 사용하는 웹 경로.
   var SESSION_WEB_BASE = window.bgmsDevWebBase || "https://bgms.kr/overwolf/sessions";
+  // 끝난 매치를 바로 여는 BGMS 3D 리플레이 경로.
+  var REPLAY_WEB_BASE = window.bgmsDevReplayBase || "https://bgms.kr/replay/3d";
   /*
    * 앱에서 열 수 있는 외부 링크. 화이트리스트로 두어 임의 URL 이 열리지 않게 한다.
    * community 는 BGMS 게시판, discord 는 공식 서버다.
@@ -40,6 +42,8 @@
   var SESSION_QUEUE_STORAGE_KEY = "bgms_companion_session_queue";
   var SESSION_REQUEST_TIMEOUT_MS = 15000;
   var STATE_NOTIFY_DELAY_MS = 50;
+  // 로비 복귀 신호가 오지 않을 때 matchEnd 뒤 요약을 확정하기까지 기다리는 시간.
+  var MATCH_CLOSE_GRACE_MS = 20000;
 
   var REQUIRED_FEATURES = gepState.REQUIRED_FEATURES;
   var MAX_FEATURE_ATTEMPTS = 8;
@@ -70,6 +74,7 @@
   var notificationTimer = null;
   var featureRetryTimer = null;
   var infoUpdateRevision = 0;
+  var matchCloseTimer = null;
 
   var state = gepState.createInitialState();
 
@@ -77,18 +82,22 @@
     if (!pubgRunning) return;
     infoUpdateRevision += 1;
     setState(gepState.reduceInfoUpdatesEvent(state, event));
+    settleMatchSummary();
   };
 
   var newEventsListener = function (event) {
     if (!pubgRunning) return;
     infoUpdateRevision += 1;
-    var nextState = gepState.reduceNewEventsEvent(state, event);
 
-    setState(nextState);
-
-    if (nextState.summaryReady && !nextState.summarySent) {
-      enqueueSessionSummary();
+    // 다음 matchStart 가 상태를 초기화하기 전에 직전 매치 요약을 확정한다.
+    if (event && Array.isArray(event.events) && event.events.some(function (entry) {
+      return entry && entry.name === "matchStart";
+    })) {
+      finalizeMatchSummary();
     }
+
+    setState(gepState.reduceNewEventsEvent(state, event));
+    settleMatchSummary();
   };
 
   var gepErrorListener = function (event) {
@@ -183,6 +192,8 @@
   function setOverlayVisible(nextVisible) {
     if (overlayVisible === nextVisible) return;
     overlayVisible = nextVisible;
+    // 데스크탑 창 상태 띠가 오버레이 표시 여부를 보여줄 수 있게 상태에도 남긴다.
+    patchState({ overlayVisible: overlayVisible });
 
     if (overlayVisible) {
       showWindow(IN_GAME_WINDOW);
@@ -231,7 +242,32 @@
     setOverlayVisible(false);
   }
 
+  // 로비 복귀로 확정됐으면 바로 보내고, 아니면 유예 타이머로 확정을 예약한다.
+  function settleMatchSummary() {
+    if (state.summaryReady && !state.summarySent) {
+      finalizeMatchSummary();
+      return;
+    }
+
+    if (gepState.isSummaryPending(state) && matchCloseTimer === null) {
+      matchCloseTimer = window.setTimeout(finalizeMatchSummary, MATCH_CLOSE_GRACE_MS);
+    }
+  }
+
+  function finalizeMatchSummary() {
+    if (matchCloseTimer !== null) {
+      window.clearTimeout(matchCloseTimer);
+      matchCloseTimer = null;
+    }
+
+    if (gepState.isSummaryPending(state)) {
+      enqueueSessionSummary();
+    }
+  }
+
   function resetGepRuntimeState(detectedGameId, detectedClassId, detectedGameRunning) {
+    // 게임 종료나 전환으로 상태를 지우기 전에 끝난 매치 요약을 확정한다.
+    finalizeMatchSummary();
     pubgRunning = false;
     gepAttemptToken += 1;
     requiredFeaturesActive = false;
@@ -379,6 +415,10 @@
 
       if (event && event.name === "open_desktop") {
         toggleDesktopWindow();
+      }
+
+      if (event && event.name === "mark_moment" && pubgRunning) {
+        setState(gepState.reduceBookmark(state));
       }
     });
   }
@@ -616,6 +656,8 @@
     if (!settingsStore.canSendHandoff(settings)) {
       patchState({
         summaryReady: false,
+        // 보내지 않기로 처리한 매치다. 유예 타이머가 다시 확정하지 않게 표시한다.
+        summarySent: true,
         handoffEnabled: settings.handoffEnabled,
         lastEvent: settings.handoffEnabled
           ? "Session summary skipped (BGMS nickname required)"
@@ -854,6 +896,18 @@
 
       if (!hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
         return null;
+      }
+
+      overwolf.utils.openUrlInDefaultBrowser(url);
+
+      return url;
+    },
+    // 최근 매치를 BGMS 맵 리플레이로 연다. 공식 match_id 와 닉네임이 없으면 열지 않는다.
+    openMatchReplay: function () {
+      var url = gepState.buildReplayUrl(REPLAY_WEB_BASE, state, settingsStore.read());
+
+      if (!url || !hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
+        return url;
       }
 
       overwolf.utils.openUrlInDefaultBrowser(url);

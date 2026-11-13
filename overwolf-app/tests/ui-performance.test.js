@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const gep = require("../gep-state.js");
 
 const appDir = path.join(__dirname, "..");
 
@@ -272,7 +273,9 @@ function createDesktopSandbox() {
     "desktop-service-status", "desktop-game-status", "desktop-match-id", "desktop-last-event",
     "desktop-recent-updates", "desktop-seen-features", "desktop-supported-features",
     "desktop-missing-updates", "desktop-ignored-updates", "desktop-gep-version", "desktop-gep-error",
-    "desktop-handoff", "desktop-required-result", "hotkey-toggle-overlay", "hotkey-open-desktop"
+    "desktop-handoff", "desktop-required-result", "hotkey-toggle-overlay", "hotkey-open-desktop",
+    "match-card-status", "match-card-map", "match-card-placement", "match-card-headshots",
+    "match-card-longest", "match-card-moments", "match-card-review", "match-card-hint", "match-card-mode"
   ]);
   const sandbox = {
     document: document,
@@ -317,6 +320,16 @@ test("overlay skips hidden debug updates and avoids repeated text writes", () =>
   ui.sandbox.bgmsI18n.setOverlaySettings({ opacity: 1, mode: "debug", position: "top-left" });
   ui.sandbox.emitWindowEvent("bgms:overlay-settings-change");
   assert.equal(ui.document.elements["debug-raw"].textContent, "raw landed");
+});
+
+test("오버레이: GEP 16317cm는 163m로 표시하고 요약에는 163.17m를 유지한다", () => {
+  const ui = createOverlaySandbox();
+  const state = gep.reduceInfoUpdatesEvent(gep.createInitialState(), {
+    feature: "kill", info: { match_info: { max_kill_distance: "16317" } }
+  });
+  ui.controller.emit(state);
+  assert.equal(ui.document.elements["longest-kill"].textContent, "163m");
+  assert.equal(gep.buildSessionSummary(state, {}).gep_summary.max_kill_distance, 163.17);
 });
 
 test("desktop defers collapsed diagnostics until disclosure opens with the latest state", () => {
@@ -364,4 +377,110 @@ test("desktop shows an explicit unassigned hotkey without hiding it behind the m
   ui.controller.setAssignedHotkeys(null);
   ui.hotkeyHub.emit();
   assert.equal(ui.document.elements["hotkey-toggle-overlay"].textContent, "Ctrl+Shift+B");
+});
+
+test("desktop match card shows the finished match and enables review only with handoff and an official match id", () => {
+  const ui = createDesktopSandbox();
+  const state = Object.assign(createState("Match ended"), {
+    matchStartedAt: "2026-11-13T00:00:00.000Z",
+    matchEnded: true,
+    matchId: "match.bro.official.pc-2018-36.steam.squad.as.2026.11.13.00.abc",
+    mapName: "Baltic_Main",
+    rankPlace: 3,
+    rankTotal: 98,
+    maxKillDistance: 163.17,
+    eventTimeline: [
+      { t: 65, kind: "kill" },
+      { t: 192, kind: "knockedout" },
+      { t: 220, kind: "death" }
+    ]
+  });
+
+  ui.sandbox.bgmsGepState.buildReplayUrl = require("../gep-state.js").buildReplayUrl;
+  ui.controller.emit(state);
+  assert.equal(ui.document.elements["match-card-status"].textContent, "matchCardEnded");
+  assert.equal(ui.document.elements["match-card-map"].textContent, "Erangel");
+  assert.equal(ui.document.elements["match-card-placement"].textContent, "#3 / 98");
+  assert.equal(ui.document.elements["match-card-longest"].textContent, "163m");
+  assert.equal(ui.document.elements["match-card-moments"].textContent, "momentKnocked 3:12 · momentDeath 3:40");
+  assert.equal(ui.document.elements["match-card-review"].disabled, true);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintNickname");
+  assert.equal(ui.document.elements["match-card-review"].textContent, "matchCardReplayDeath");
+
+  ui.sandbox.bgmsSettings.read = () => ({ handoffEnabled: false, playerName: "Player", platform: "steam" });
+  ui.controller.emit(Object.assign({}, state, { matchId: "" }));
+  assert.equal(ui.document.elements["match-card-review"].disabled, true);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintMatchId");
+
+  ui.controller.emit(Object.assign({}, state, { matchId: "match.bro.official.pc-2018-36.steam.squad.as.2026.11.13.00.ce8d1a14-b2af-41c8-8bf4-d2a504326630" }));
+  assert.equal(ui.document.elements["match-card-review"].disabled, false);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintReplay");
+});
+
+function createAdsSandbox() {
+  const appended = [];
+  const stateListeners = [];
+  const created = [];
+  const container = createElement();
+  const sandbox = {
+    console: { warn: function () {} },
+    document: {
+      head: { appendChild: function (node) { appended.push(node); } },
+      createElement: function () { return {}; },
+      getElementById: function (id) { return id === "bgms-ad-desktop" ? container : null; }
+    },
+    overwolf: { windows: { onStateChanged: { addListener: function (listener) { stateListeners.push(listener); } } } }
+  };
+  sandbox.window = sandbox;
+  vm.createContext(sandbox);
+  loadScript(sandbox, "ads.js");
+  return {
+    sandbox: sandbox,
+    appended: appended,
+    created: created,
+    container: container,
+    installSdk: function () {
+      sandbox.OwAd = function (element, settings) {
+        const instance = { element: element, settings: settings, shutdowns: 0, shutdown: function () { instance.shutdowns++; } };
+        created.push(instance);
+        return instance;
+      };
+    },
+    setWindowState: function (state, name) {
+      stateListeners.forEach(function (listener) { listener({ window_name: name || "desktop", window_state: state }); });
+    }
+  };
+}
+
+test("ads load the official SDK asynchronously and create one 400x300 container", () => {
+  const ads = createAdsSandbox();
+  assert.equal(ads.appended.length, 1);
+  assert.equal(ads.appended[0].src, "https://content.overwolf.com/libs/ads/latest/owads.min.js");
+  assert.equal(ads.appended[0].async, true);
+  ads.installSdk();
+  ads.appended[0].onload();
+  assert.equal(ads.created.length, 1);
+  assert.equal(ads.created[0].element, ads.container);
+  assert.deepEqual(JSON.parse(JSON.stringify(ads.created[0].settings)), { size: { width: 400, height: 300 }, containerId: "bgms_400x300_dt" });
+  assert.ok(ads.created[0].settings.containerId.length <= 20);
+});
+
+test("ads stop while the desktop window is minimized and restart once on restore", () => {
+  const ads = createAdsSandbox();
+  ads.installSdk();
+  ads.appended[0].onload();
+  ads.setWindowState("minimized", "in_game");
+  assert.equal(ads.created[0].shutdowns, 0);
+  ads.setWindowState("minimized");
+  assert.equal(ads.created[0].shutdowns, 1);
+  ads.setWindowState("normal");
+  ads.setWindowState("normal");
+  assert.equal(ads.created.length, 2);
+});
+
+test("ads fail quietly when the SDK cannot load", () => {
+  const ads = createAdsSandbox();
+  ads.appended[0].onerror();
+  ads.setWindowState("normal");
+  assert.equal(ads.created.length, 0);
 });

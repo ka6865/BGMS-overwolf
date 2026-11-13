@@ -467,10 +467,21 @@
    */
   function appendTimeline(state, kind, detail) {
     var entry;
-    var timeline;
+    var timeline = state.eventTimeline;
+    var oldestKill;
 
-    if (state.eventTimeline.length >= MAX_TIMELINE_ENTRIES) {
-      return state;
+    /*
+     * 상한에 닿으면 kill 은 버리고, 사망·기절·북마크 같은 복기 기준점은
+     * 가장 오래된 kill 을 밀어내고 보관한다. 킬이 많은 판에서 마지막 사망이 빠지지 않게 한다.
+     */
+    if (timeline.length >= MAX_TIMELINE_ENTRIES) {
+      oldestKill = kind === "kill" ? -1 : timeline.findIndex(function (item) { return item.kind === "kill"; });
+
+      if (oldestKill === -1) {
+        return state;
+      }
+
+      timeline = timeline.slice(0, oldestKill).concat(timeline.slice(oldestKill + 1));
     }
 
     entry = {
@@ -482,7 +493,7 @@
       entry.detail = String(detail).slice(0, 40);
     }
 
-    timeline = state.eventTimeline.concat([entry]);
+    timeline = timeline.concat([entry]);
 
     return patch(state, {
       eventTimeline: timeline
@@ -518,6 +529,8 @@
     return patch(state, {
       phase: phase,
       phaseIsOfficial: OFFICIAL_PHASES.indexOf(phase) !== -1,
+      // 매치 종료 뒤 로비로 돌아오면 늦게 온 사망·순위까지 모였으므로 요약을 확정한다.
+      summaryReady: state.summaryReady || (phase === "lobby" && isSummaryPending(state)),
       lastEvent: "Phase changed to " + phase
     });
   }
@@ -587,9 +600,14 @@
       });
     }
 
+    // 공식 문서상 max_kill_distance는 cm 단위다. 상태와 세션 요약에는 미터로 보관한다.
     if (key === "max_kill_distance") {
+      if (parsed < 0) {
+        return state;
+      }
+
       return patch(state, {
-        maxKillDistance: parsed,
+        maxKillDistance: parsed / 100,
         lastEvent: "Longest kill updated"
       });
     }
@@ -879,9 +897,66 @@
     }, state);
   }
 
+  var MATCH_UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+  /*
+   * 끝난 매치의 BGMS 3D 리플레이 주소. bgms.kr lib/overwolf/session-view.ts 의 buildReplayPath 와
+   * 같은 쿼리(matchId=UUID, nickname, platform, t)를 쓴다. 공식 match_id 의 마지막 UUID 가 텔레메트리 키다.
+   * 사망 기록이 있으면 마지막 사망 시각으로, 없으면 처음부터 연다. 시각은 로컬 시계 기준 근사값이다.
+   */
+  function buildReplayUrl(base, state, settings) {
+    var uuids = state && state.matchId ? String(state.matchId).match(MATCH_UUID_PATTERN) : null;
+    var deaths;
+    var query;
+
+    if (!uuids || !state.matchEnded || !settings || !settings.playerName) {
+      return null;
+    }
+
+    query = "matchId=" + encodeURIComponent(uuids[uuids.length - 1].toLowerCase())
+      + "&nickname=" + encodeURIComponent(settings.playerName)
+      + "&platform=" + encodeURIComponent(settings.platform || "steam");
+    deaths = (state.eventTimeline || []).filter(function (entry) {
+      return entry.kind === "death" && typeof entry.t === "number" && entry.t >= 0;
+    });
+
+    if (deaths.length) {
+      query += "&t=" + Math.round(deaths[deaths.length - 1].t);
+    }
+
+    return base + "?" + query;
+  }
+
+  // 매치당 사용자 북마크 상한. 타임라인 40개 상한 안에서 자동 이벤트 자리를 남긴다.
+  var MAX_BOOKMARKS = 10;
+
+  /*
+   * 사용자가 핫키로 남긴 "나중에 볼 순간". 진행 중인 매치에서만 받고, 시각만 남긴다.
+   * 시각은 로컬 시계 기준이라 웹은 대략적인 시점으로만 다룬다.
+   */
+  function reduceBookmark(state) {
+    var count = state.eventTimeline.filter(function (entry) { return entry.kind === "bookmark"; }).length;
+
+    if (!state.matchStartedAt || state.matchEnded || count >= MAX_BOOKMARKS) {
+      return state;
+    }
+
+    return appendTimeline(patch(state, {
+      lastEvent: "Moment bookmarked"
+    }), "bookmark");
+  }
+
+  /*
+   * matchEnd를 받았지만 요약을 아직 보내지 않은 상태. 확정은 로비 복귀(applyPhase)나
+   * background 의 유예 타이머·다음 matchStart·게임 종료가 맡는다.
+   */
+  function isSummaryPending(state) {
+    return Boolean(state.matchEnded && !state.summarySent);
+  }
+
   /*
    * matchEnd는 사망 시점과 로비 복귀 시점에 각각 발생할 수 있다.
-   * 첫 수신에서만 summaryReady를 세우고 이후에는 matchEndCount만 증가시킨다.
+   * 첫 matchEnd 뒤에도 사망·순위가 늦게 올 수 있어 여기서는 요약을 확정하지 않는다.
    */
   function reduceGameEvent(state, rawName, rawData) {
     var name = getStringValue(rawName);
@@ -910,7 +985,6 @@
           matchEnded: true,
           matchEndedAt: nextState.matchEndedAt || new Date().toISOString(),
           matchEndCount: nextState.matchEndCount + 1,
-          summaryReady: nextState.matchEndCount === 0 && !nextState.summarySent,
           lastEvent: "Match ended"
         });
       case "kill":
@@ -1098,6 +1172,10 @@
     calculateAlivePlayers: calculateAlivePlayers,
     isServiceDegraded: isServiceDegraded,
     buildSessionSummary: buildSessionSummary,
+    isSummaryPending: isSummaryPending,
+    reduceBookmark: reduceBookmark,
+    buildReplayUrl: buildReplayUrl,
+    MAX_BOOKMARKS: MAX_BOOKMARKS,
     safeParse: safeParse,
     summarizeValue: summarizeValue
   };

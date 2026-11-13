@@ -83,6 +83,7 @@ After a match ends, BGMS Companion can send one compact session summary to BGMS.
 | `in-game.js` / `in-game.html` | Compact HUD renderer |
 | `desktop.js` / `desktop.html` | Settings and live diagnostics window |
 | `i18n.js` | English default dictionary plus optional Korean |
+| `ads.js` | Overwolf Ads SDK loader for the single 400x300 desktop-window ad container |
 | `dev-harness/` | Browser harness with a mock Overwolf API and official-shaped GEP scenarios |
 | `tests/` | `node --test` suites for the reducer and the background wiring |
 
@@ -114,7 +115,7 @@ GEP listeners are removed before being added again, which is the documented best
 
 `match_id` and `pseudo_match_id` are stored separately. `effectiveMatchId` prefers `match_id` and falls back to `pseudo_match_id`.
 
-`matchEnd` can fire twice (on death and on returning to the lobby). Only the first event marks the session summary as ready; later ones just increase `matchEndCount`. A new `session_id` is issued on `matchStart` so a server-side idempotency key never collides across matches.
+`matchEnd` can fire twice (on death and on returning to the lobby), and deaths or placement can arrive after the first one. The summary is therefore finalized once, at whichever comes first: phase `lobby`, the next `matchStart`, the game closing, or 20 seconds after the first `matchEnd`. Later `matchEnd` events only increase `matchEndCount`. A new `session_id` is issued on `matchStart` so a server-side idempotency key never collides across matches.
 
 Feature routing is keyed on the GEP `feature` field first. The `rank` feature uses info key `match_info.me`, which collides with the `me` feature if only the key is inspected.
 

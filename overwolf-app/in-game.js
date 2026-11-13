@@ -137,7 +137,7 @@
   }
 
   /*
-   * max_kill_distance 는 소수점이 붙은 미터 값으로 온다.
+   * maxKillDistance 는 gep-state 에서 cm 를 미터로 바꾼 소수 값이다.
    * 좁은 HUD 에서 자릿수가 흔들리지 않게 정수 미터로 줄인다.
    */
   function formatDistance(value) {
@@ -159,7 +159,8 @@
         : state.detectedGameRunning
           ? t("waitingForMatch")
           : t("waitingForPubg");
-    var phaseLabel = state.phase ? translatePhase(state.phase) : t("idle");
+    // 매치가 끝났으면 단계 칸 하나로 종료를 알리고 아래 상태 줄의 같은 말은 숨긴다.
+    var phaseLabel = state.matchEnded ? t("matchEndedShort") : state.phase ? translatePhase(state.phase) : t("idle");
     /*
      * 표시 항목은 배그 기본 HUD가 보여주지 않는 값만 남긴다.
      * 킬 수, 생존자 수, 체력, 무기 상태는 게임 화면에 이미 있어 중복 표시하지 않는다.
@@ -181,6 +182,7 @@
     lastState = state;
 
     setText(elements.matchState, matchLabel);
+    toggleHidden(elements.matchState, Boolean(state.matchEnded));
     setText(elements.phase, phaseLabel);
     setText(elements.headshots, String(state.headshots || 0));
     setText(elements.longestKill, hasLongestKill ? formatDistance(state.maxKillDistance) : "--");

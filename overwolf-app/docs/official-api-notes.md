@@ -4,6 +4,8 @@
 
 **최근 확인일: 2026-09-07 (게임 정보 갱신, 개발 환경, 핫키 기준 재확인)**
 
+**추가 설계 확인: 2026-09-08 (사망 복기의 시간축·경기 종료 기준, 문서 하단)**
+
 ## 기준 문서
 
 - Overwolf Real-time Game Events intro: https://dev.overwolf.com/ow-native/live-game-data-gep/live-game-data-gep-intro/
@@ -345,6 +347,7 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - `rank`: 공식 문서상 info key는 `match_info.me`(순위)와 `match_info.total`(총원)이며 **값이 문자열로 온다**(예: `"38"`, `"98"`). key 이름 `me`가 `me` feature와 겹치므로 반드시 feature 기준으로 분기한다. `gep-state.js`의 `applyRank`가 이를 담당한다.
 - `map`: 맵 이름만 사용한다. GEP는 `Erangel_Main` 같은 내부 코드로 준다. 좌표나 미니맵으로 연결하지 않는다.
 - `kill` feature에서 `headshots`와 `max_kill_distance`를 추가로 수집한다. 둘 다 누적값이다. `total_damage_dealt`와 `damage_dealt`는 계속 차단한다.
+- `max_kill_distance`는 공식 표 기준 **cm 단위**다("Max kill distance in CM", 예시 `{"info":{"match_info":{"max_kill_distance":"8488.008789"}},"feature":"kill"}`, 2026-11-13 확인, https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/playerunknowns-battlegrounds). `applyKill`이 100으로 나눠 미터로 보관하고, 오버레이는 반올림한 정수 미터(`163m`)로, 세션 요약 `gep_summary.max_kill_distance`는 소수 미터(`163.17`)로 쓴다. 음수, 숫자가 아닌 값, 무한대는 무시하고 이전 값을 유지한다. 이전 버전은 cm 값을 그대로 미터로 표시해 100배 큰 거리가 보였다.
 
 `map`은 매치 간 유지하고 `rank`는 초기화한다. 맵은 로비/로딩 단계에서 먼저 도착할 수 있고 순위는 매치 종료 시점 값이기 때문이다.
 
@@ -457,3 +460,44 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 세션 POST는 15초에 타임아웃 처리하고 지원 런타임에서는 `AbortController`로 중단한다. 지원하지 않아도 큐 잠금은 해제되며 늦은 응답은 중복 반영하지 않는다. 재시도는 네트워크 오류/429/5xx만 허용한다.
 - 게임 종료/교체 전의 구독 응답과 snapshot은 현재 상태를 덮어쓰지 않는다. snapshot 요청 뒤 새 라이브 데이터가 수신되었으면 오래된 snapshot도 적용하지 않는다.
 - GEP feature/key/value 파서는 변경하지 않았다. 실게임 수신 여부와 FPS/CPU 효과는 [Windows 절차](windows-test-guide.md)에 따라 별도로 기록해야 한다.
+
+## 사망 복기 구현 준비 기준 (2026-09-08)
+
+공식 자료 재확인:
+
+- [Overwolf PUBG GEP](https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/playerunknowns-battlegrounds/)는 `matchEnd`가 본인 사망과 로비 복귀에 발생할 수 있다고 설명한다. 따라서 경기 전체 종료 보장으로 사용하지 않는다. `pseudo_match_id`도 공식 `match_id`와 별개다.
+- [PUBG Telemetry](https://documentation.pubg.com/en/telemetry.html)는 공식 match의 asset을 통해 telemetry를 조회하는 경로를 설명한다. 새 앱 직접 호출 경로를 만들라는 의미가 아니며 BGMS 기존 웹 조회 경로를 유지한다.
+- [PUBG Telemetry Events](https://documentation.pubg.com/en/telemetry-events.html)는 `LogMatchEnd`, `LogPlayerKillV2`의 victim, 재배치 이벤트를 정의한다. 공식 원문 스키마와 BGMS가 변환해 웹에 전달하는 스키마는 구분한다.
+
+코드 관찰이며 실게임 관측값은 아님:
+
+- 앱의 `event_timeline.t`는 `Date.now() - matchStartedAt` 기반이다. GEP matchStart 수신과 공식 텔레메트리 시간축의 정렬은 아직 검증되지 않았다.
+- 앱 타임라인은 앞선 40개만 보관하며 첫 matchEnd에서 요약을 만든다. 후속 콜백의 death/순위를 이전 요약에 포함한다고 보장할 수 없다.
+- 웹 원격 main `9884f5b` 리플레이는 변환된 `kill`/`victim`/`relativeTimeMs`를 사용해 플레이어 사망 목록을 만든다. M1은 공식 목록에서 복기 구간을 고르도록 설계한다.
+- 변환 payload의 이벤트 존재나 HTTP 200만으로 경기 전체 종료를 입증하지 않는다. 기존 서버 경로의 종료 보장은 실행 계획 Task 1의 확인 대상이다.
+
+새 GEP API·권한·payload 필드는 이번 준비에서 추가하지 않았다. [설계](../../docs/superpowers/specs/2026-09-08-death-review-design.md)에 구현 경계와 검증 조건을 기록한다.
+
+## 광고와 재설계 기준 (2026-11-13)
+
+공식 문서에서 확인한 사실:
+
+- 2026-11-01부터 Overwolf 광고, Tebex 구독, 또는 둘 다를 붙인 앱만 승인한다. 외부 수익화와 개인용 비공개 앱은 승인하지 않는다(https://dev.overwolf.com/ow-native/monetization/overview).
+- Ads SDK는 `https://content.overwolf.com/libs/ads/latest/owads.min.js`를 async로 불러오고 `new OwAd(container, { size: { width: 400, height: 300 }, containerId })`로 만든다. `containerId`는 20자 이하. 정리는 `shutdown()`. 이벤트 리스너는 deprecated다(https://dev.overwolf.com/ow-native/reference/ads/owad).
+- Ads SDK는 manifest 권한 `Extensions`, `Streaming`, `Profile`, `GameInfo`를 요구한다.
+- 광고 컨테이너의 부모는 `background: transparent`, 컨테이너에는 SDK가 만든 요소 외 자식이 없어야 하고 항상 보여야 한다. 창당 영상 광고 컨테이너는 1개.
+- 광고를 두면 안 되는 곳: 로그인/가입 창, 오류/알림 창, 광고만 있는 창, **앱 설정 페이지**(https://dev.overwolf.com/ow-native/monetization/advertising/standard-ads/working-with-ads).
+
+구현 선택:
+
+- `ads.js`가 데스크탑 창에만 400x300 컨테이너 하나(`bgms_400x300_dt`)를 만든다. 인게임 HUD에는 광고가 없다. 창이 최소화되면 `shutdown()`, 복원되면 다시 만든다. SDK 로드 실패 시 빈 칸만 남고 기능은 그대로다.
+- 데스크탑 창의 주 화면은 최근 매치 카드다. 설정은 접힘 영역(`settings-disclosure`)으로 옮겼고, 설정이 끝나지 않았을 때만 자동으로 펼친다. 설정 화면이 열린 상태에서 광고가 함께 보이는 것을 Overwolf QA가 문제 삼을 수 있으므로 심사 피드백을 확인한다.
+- 모든 기능은 광고와 무관하게 무료다(PUBG API Exclusive Access 금지). 광고 제거 구독은 아직 구현하지 않았다.
+- 북마크 핫키 `mark_moment`(기본 `Ctrl+Shift+M`)는 진행 중 매치에서만, 매치당 10개까지 타임라인에 `bookmark`를 남긴다. 서버는 모르는 kind를 422 없이 버리므로, 웹 저장소에서 `bookmark` 허용이 배포되기 전까지는 전송돼도 저장되지 않는다.
+
+## 디자인 개편과 리플레이 바로가기 (2026-11-13)
+
+- 데스크탑 창과 HUD를 bgms.kr 브랜드(앰버 #F2A900 바, BG/MS 워드마크, 검정 바탕, Outfit)로 다시 만들었다. 기준은 `PRODUCT.md`, `DESIGN.md`, `.impeccable/surfaces/overwolf-app-desktop-html.md`.
+- 최근 매치의 주 버튼은 BGMS 3D 리플레이를 바로 연다: `https://bgms.kr/replay/3d?matchId=<GEP match_id 끝 UUID>&nickname&platform&t=<마지막 사망 초>`. 웹 `lib/overwolf/session-view.ts`의 `buildReplayPath`와 같은 쿼리다. `t`는 로컬 시계 기준 근사값이다. 전송 동의 없이 닉네임과 공식 match_id만 있으면 열린다. 실제 bgms.kr 페이지에서 열어 보는 확인은 아직 하지 않았다.
+- 폰트: Outfit(라틴, OFL)과 Pretendard 1.3.9의 한글 서브셋을 앱에 싣는다. 서브셋은 OFL 예약 폰트 이름 조건 때문에 "BGMS Korean"으로 이름을 바꿨다. `i18n.js`의 한국어 문자열이 바뀌면 서브셋을 다시 만든다(`assets/fonts/README.txt`).
+- 아이콘은 bgms.kr `public/logo.png`(앰버 기둥 로고)에서 만들었다.

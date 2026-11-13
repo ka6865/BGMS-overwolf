@@ -145,7 +145,7 @@ test("map: 맵 이름만 반영하고 좌표 키는 무시한다", () => {
 test("kill: headshots와 max_kill_distance를 수집하고 damage는 차단한다", () => {
   let state = gep.reduceInfoUpdatesEvent(baseState(), {
     feature: "kill",
-    info: { me: { kills: "3", headshots: "2", max_kill_distance: "184.5" } }
+    info: { me: { kills: "3", headshots: "2", max_kill_distance: "18450" } }
   });
 
   assert.equal(state.kills, 3);
@@ -160,6 +160,29 @@ test("kill: headshots와 max_kill_distance를 수집하고 damage는 차단한�
   assert.equal(state.headshots, 2);
   assert.ok(state.ignoredUpdates.some((entry) => entry.indexOf("blocked:total_damage_dealt") === 0));
   assert.equal(JSON.stringify(state).indexOf("412.8"), -1);
+});
+
+test("kill: 공식 cm 값을 미터로 한 번만 변환해 상태와 세션 요약에 보관한다", () => {
+  for (const [raw, meters] of [["16317", 163.17], [16317, 163.17], ["8488.008789", 84.88008789], ["0", 0]]) {
+    const update = { feature: "kill", info: { match_info: { max_kill_distance: raw } } };
+    let state = gep.reduceInfoUpdatesEvent(baseState(), update);
+    assert.equal(state.maxKillDistance, meters);
+    state = gep.reduceInfoUpdatesEvent(state, update);
+    assert.equal(state.maxKillDistance, meters);
+    assert.equal(gep.buildSessionSummary(state, {}).gep_summary.max_kill_distance, meters);
+  }
+});
+
+test("kill: 잘못된 거리 update는 이전 정상 미터 값을 유지한다", () => {
+  let state = gep.reduceInfoUpdatesEvent(baseState(), {
+    feature: "kill", category: "match_info", key: "max_kill_distance", value: "16317"
+  });
+  for (const value of [-1, "invalid", Infinity]) {
+    state = gep.reduceInfoUpdatesEvent(state, {
+      feature: "kill", category: "match_info", key: "max_kill_distance", value
+    });
+    assert.equal(state.maxKillDistance, 163.17);
+  }
 });
 
 test("roster: 공식 roster_XX payload로 생존자 수를 계산한다", () => {
@@ -219,22 +242,34 @@ test("kill: info kills는 절대값, kill 이벤트는 증분으로 처리한다
   assert.equal(state.kills, 4);
 });
 
-test("matchEnd: 중복 수신 시 요약 대상은 첫 이벤트 한 번만이다", () => {
+test("matchEnd: 중복 수신해도 첫 종료 시각을 유지하고 요약은 로비 복귀에서 확정한다", () => {
   let state = gep.reduceGameEvent(baseState(), "matchStart", "");
 
   state = gep.reduceGameEvent(state, "matchEnd", "");
 
   assert.equal(state.matchEnded, true);
   assert.equal(state.matchEndCount, 1);
-  assert.equal(state.summaryReady, true);
+  assert.equal(state.summaryReady, false);
+  assert.equal(gep.isSummaryPending(state), true);
 
   const firstEndedAt = state.matchEndedAt;
 
   state = gep.reduceGameEvent(state, "matchEnd", "");
+  state = gep.reduceGameEvent(state, "death", "");
 
   assert.equal(state.matchEndCount, 2);
-  assert.equal(state.summaryReady, false);
   assert.equal(state.matchEndedAt, firstEndedAt);
+
+  state = gep.reduceInfoUpdatesEvent(state, { feature: "phase", info: { game_info: { phase: "lobby" } } });
+
+  assert.equal(state.summaryReady, true);
+  assert.equal(gep.buildSessionSummary(state, {}).event_timeline.at(-1).kind, "death");
+});
+
+test("phase: 매치 종료 전 로비는 요약을 확정하지 않는다", () => {
+  const state = gep.reduceInfoUpdatesEvent(baseState(), { feature: "phase", info: { game_info: { phase: "lobby" } } });
+
+  assert.equal(state.summaryReady, false);
 });
 
 test("matchStart: 카운터는 초기화하되 식별자와 진단은 유지하고 세션 id는 새로 발급한다", () => {
@@ -403,7 +438,7 @@ test("buildSessionSummary: 사후 분석 연결 필드와 타임라인을 담는
   });
   state = gep.reduceInfoUpdatesEvent(state, {
     feature: "kill",
-    info: { me: { kills: "4", headshots: "2", max_kill_distance: "212.75" } }
+    info: { me: { kills: "4", headshots: "2", max_kill_distance: "21275" } }
   });
   state = gep.reduceGameEvent(state, "death", "");
   state = gep.reduceNewEventsEvent(state, {
@@ -554,6 +589,32 @@ test("eventTimeline: 최대 항목 수를 넘으면 더 쌓지 않는다", () =>
   assert.equal(state.kills, gep.MAX_TIMELINE_ENTRIES + 15);
 });
 
+test("eventTimeline: 상한이 차도 사망은 가장 오래된 kill을 밀어내고 보관한다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  for (let i = 0; i < gep.MAX_TIMELINE_ENTRIES + 20; i += 1) {
+    state = gep.reduceGameEvent(state, "kill", "");
+  }
+  state = gep.reduceGameEvent(state, "knockedout", "");
+  state = gep.reduceGameEvent(state, "death", "");
+
+  const kinds = state.eventTimeline.map((entry) => entry.kind);
+  assert.equal(kinds.length, gep.MAX_TIMELINE_ENTRIES);
+  assert.deepEqual(kinds.slice(-2), ["knockedout", "death"]);
+  assert.equal(gep.buildSessionSummary(state, {}).event_timeline.at(-1).kind, "death");
+});
+
+test("eventTimeline: kill이 하나도 없이 상한이 차면 새 항목을 버린다", () => {
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+
+  for (let i = 0; i < gep.MAX_TIMELINE_ENTRIES + 3; i += 1) {
+    state = gep.reduceGameEvent(state, i % 2 ? "revived" : "knockedout", "");
+  }
+
+  assert.equal(state.eventTimeline.length, gep.MAX_TIMELINE_ENTRIES);
+  assert.equal(state.eventTimeline.at(-1).kind, "revived");
+});
+
 test("matchStart: 타임라인과 순위는 초기화하되 맵 이름은 유지한다", () => {
   let state = gep.reduceInfoUpdatesEvent(baseState(), {
     feature: "map",
@@ -578,4 +639,35 @@ test("matchStart: 타임라인과 순위는 초기화하되 맵 이름은 유지
   assert.equal(state.rankTotal, null);
   assert.equal(state.headshots, 0);
   assert.equal(state.mapName, "Miramar_Main");
+});
+
+test("bookmark: 진행 중인 매치에서만 받고 매치당 상한을 지킨다", () => {
+  assert.equal(gep.reduceBookmark(baseState()).eventTimeline.length, 0);
+
+  let state = gep.reduceGameEvent(baseState(), "matchStart", "");
+  for (let i = 0; i < gep.MAX_BOOKMARKS + 3; i += 1) {
+    state = gep.reduceBookmark(state);
+  }
+
+  assert.equal(state.eventTimeline.filter((entry) => entry.kind === "bookmark").length, gep.MAX_BOOKMARKS);
+  assert.equal(state.lastEvent, "Moment bookmarked");
+
+  state = gep.reduceGameEvent(state, "matchEnd", "");
+  assert.equal(gep.reduceBookmark(state), state);
+});
+
+test("buildReplayUrl: 끝난 매치의 공식 UUID와 닉네임으로 마지막 사망 시각 리플레이를 만든다", () => {
+  const state = Object.assign(baseState(), {
+    matchEnded: true,
+    matchId: "match.bro.official.pc-2018-03.steam.solo.eu.2019.05.07.08.CE8D1A14-B2AF-41C8-8BF4-D2A504326630",
+    eventTimeline: [{ t: 90, kind: "death" }, { t: 1440.4, kind: "death" }]
+  });
+  const settings = { playerName: "My Nick", platform: "kakao" };
+
+  assert.equal(gep.buildReplayUrl("https://bgms.kr/replay/3d", state, settings),
+    "https://bgms.kr/replay/3d?matchId=ce8d1a14-b2af-41c8-8bf4-d2a504326630&nickname=My%20Nick&platform=kakao&t=1440");
+  assert.equal(gep.buildReplayUrl("x", Object.assign({}, state, { matchEnded: false }), settings), null);
+  assert.equal(gep.buildReplayUrl("x", Object.assign({}, state, { matchId: "pseudo-only" }), settings), null);
+  assert.equal(gep.buildReplayUrl("x", state, { playerName: "" }), null);
+  assert.ok(!gep.buildReplayUrl("x", Object.assign({}, state, { eventTimeline: [] }), settings).includes("&t="));
 });
