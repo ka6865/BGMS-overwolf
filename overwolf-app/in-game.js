@@ -137,7 +137,7 @@
   }
 
   /*
-   * max_kill_distance 는 소수점이 붙은 미터 값으로 온다.
+   * maxKillDistance 는 gep-state 에서 cm 를 미터로 바꾼 소수 값이다.
    * 좁은 HUD 에서 자릿수가 흔들리지 않게 정수 미터로 줄인다.
    */
   function formatDistance(value) {

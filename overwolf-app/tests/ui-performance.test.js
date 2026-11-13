@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");
+const gep = require("../gep-state.js");
 
 const appDir = path.join(__dirname, "..");
 
@@ -317,6 +318,16 @@ test("overlay skips hidden debug updates and avoids repeated text writes", () =>
   ui.sandbox.bgmsI18n.setOverlaySettings({ opacity: 1, mode: "debug", position: "top-left" });
   ui.sandbox.emitWindowEvent("bgms:overlay-settings-change");
   assert.equal(ui.document.elements["debug-raw"].textContent, "raw landed");
+});
+
+test("오버레이: GEP 16317cm는 163m로 표시하고 요약에는 163.17m를 유지한다", () => {
+  const ui = createOverlaySandbox();
+  const state = gep.reduceInfoUpdatesEvent(gep.createInitialState(), {
+    feature: "kill", info: { match_info: { max_kill_distance: "16317" } }
+  });
+  ui.controller.emit(state);
+  assert.equal(ui.document.elements["longest-kill"].textContent, "163m");
+  assert.equal(gep.buildSessionSummary(state, {}).gep_summary.max_kill_distance, 163.17);
 });
 
 test("desktop defers collapsed diagnostics until disclosure opens with the latest state", () => {

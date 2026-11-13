@@ -587,9 +587,14 @@
       });
     }
 
+    // 공식 문서상 max_kill_distance는 cm 단위다. 상태와 세션 요약에는 미터로 보관한다.
     if (key === "max_kill_distance") {
+      if (parsed < 0) {
+        return state;
+      }
+
       return patch(state, {
-        maxKillDistance: parsed,
+        maxKillDistance: parsed / 100,
         lastEvent: "Longest kill updated"
       });
     }

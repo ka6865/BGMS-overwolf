@@ -347,6 +347,7 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - `rank`: 공식 문서상 info key는 `match_info.me`(순위)와 `match_info.total`(총원)이며 **값이 문자열로 온다**(예: `"38"`, `"98"`). key 이름 `me`가 `me` feature와 겹치므로 반드시 feature 기준으로 분기한다. `gep-state.js`의 `applyRank`가 이를 담당한다.
 - `map`: 맵 이름만 사용한다. GEP는 `Erangel_Main` 같은 내부 코드로 준다. 좌표나 미니맵으로 연결하지 않는다.
 - `kill` feature에서 `headshots`와 `max_kill_distance`를 추가로 수집한다. 둘 다 누적값이다. `total_damage_dealt`와 `damage_dealt`는 계속 차단한다.
+- `max_kill_distance`는 공식 표 기준 **cm 단위**다("Max kill distance in CM", 예시 `{"info":{"match_info":{"max_kill_distance":"8488.008789"}},"feature":"kill"}`, 2026-11-13 확인, https://dev.overwolf.com/ow-native/live-game-data-gep/supported-games/playerunknowns-battlegrounds). `applyKill`이 100으로 나눠 미터로 보관하고, 오버레이는 반올림한 정수 미터(`163m`)로, 세션 요약 `gep_summary.max_kill_distance`는 소수 미터(`163.17`)로 쓴다. 음수, 숫자가 아닌 값, 무한대는 무시하고 이전 값을 유지한다. 이전 버전은 cm 값을 그대로 미터로 표시해 100배 큰 거리가 보였다.
 
 `map`은 매치 간 유지하고 `rank`는 초기화한다. 맵은 로비/로딩 단계에서 먼저 도착할 수 있고 순위는 매치 종료 시점 값이기 때문이다.
 

@@ -145,7 +145,7 @@ test("map: 맵 이름만 반영하고 좌표 키는 무시한다", () => {
 test("kill: headshots와 max_kill_distance를 수집하고 damage는 차단한다", () => {
   let state = gep.reduceInfoUpdatesEvent(baseState(), {
     feature: "kill",
-    info: { me: { kills: "3", headshots: "2", max_kill_distance: "184.5" } }
+    info: { me: { kills: "3", headshots: "2", max_kill_distance: "18450" } }
   });
 
   assert.equal(state.kills, 3);
@@ -160,6 +160,29 @@ test("kill: headshots와 max_kill_distance를 수집하고 damage는 차단한�
   assert.equal(state.headshots, 2);
   assert.ok(state.ignoredUpdates.some((entry) => entry.indexOf("blocked:total_damage_dealt") === 0));
   assert.equal(JSON.stringify(state).indexOf("412.8"), -1);
+});
+
+test("kill: 공식 cm 값을 미터로 한 번만 변환해 상태와 세션 요약에 보관한다", () => {
+  for (const [raw, meters] of [["16317", 163.17], [16317, 163.17], ["8488.008789", 84.88008789], ["0", 0]]) {
+    const update = { feature: "kill", info: { match_info: { max_kill_distance: raw } } };
+    let state = gep.reduceInfoUpdatesEvent(baseState(), update);
+    assert.equal(state.maxKillDistance, meters);
+    state = gep.reduceInfoUpdatesEvent(state, update);
+    assert.equal(state.maxKillDistance, meters);
+    assert.equal(gep.buildSessionSummary(state, {}).gep_summary.max_kill_distance, meters);
+  }
+});
+
+test("kill: 잘못된 거리 update는 이전 정상 미터 값을 유지한다", () => {
+  let state = gep.reduceInfoUpdatesEvent(baseState(), {
+    feature: "kill", category: "match_info", key: "max_kill_distance", value: "16317"
+  });
+  for (const value of [-1, "invalid", Infinity]) {
+    state = gep.reduceInfoUpdatesEvent(state, {
+      feature: "kill", category: "match_info", key: "max_kill_distance", value
+    });
+    assert.equal(state.maxKillDistance, 163.17);
+  }
 });
 
 test("roster: 공식 roster_XX payload로 생존자 수를 계산한다", () => {
@@ -403,7 +426,7 @@ test("buildSessionSummary: 사후 분석 연결 필드와 타임라인을 담는
   });
   state = gep.reduceInfoUpdatesEvent(state, {
     feature: "kill",
-    info: { me: { kills: "4", headshots: "2", max_kill_distance: "212.75" } }
+    info: { me: { kills: "4", headshots: "2", max_kill_distance: "21275" } }
   });
   state = gep.reduceGameEvent(state, "death", "");
   state = gep.reduceNewEventsEvent(state, {
