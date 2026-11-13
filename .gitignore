@@ -35,3 +35,6 @@ coverage/
 packages/
 release/
 releases/
+
+# Impeccable 디자인 도구 캐시
+.impeccable/hook.cache.json

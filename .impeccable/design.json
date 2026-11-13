@@ -1,0 +1,477 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T17:03:36+00:00",
+  "title": "Design System: BGMS Companion",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Ballistic Amber",
+        "canonical": "#f2a900",
+        "tonalRamp": [
+          "#140800",
+          "#381f00",
+          "#5f3800",
+          "#8a5400",
+          "#b67200",
+          "#d29936",
+          "#edc17d",
+          "#ffeabc"
+        ]
+      },
+      "accent-rule": {
+        "role": "primary",
+        "displayName": "Bar Rule Amber",
+        "canonical": "#cc8b00",
+        "tonalRamp": [
+          "#140800",
+          "#362000",
+          "#5d3900",
+          "#875500",
+          "#b27300",
+          "#ce9a4b",
+          "#eac288",
+          "#ffeac2"
+        ]
+      },
+      "accent-dim": {
+        "role": "primary",
+        "displayName": "Amber Wash",
+        "canonical": "rgba(242, 169, 0, 0.12)",
+        "tonalRamp": [
+          "#0d0b07",
+          "#28251c",
+          "#474134",
+          "#69604e",
+          "#8c816b",
+          "#ada491",
+          "#cfc8ba",
+          "#f3eee4"
+        ]
+      },
+      "ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "canonical": "#0d0d0d",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Carbon Surface",
+        "canonical": "#161616",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "elevated": {
+        "role": "neutral",
+        "displayName": "Raised Carbon",
+        "canonical": "#1f1f1f",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover Veil",
+        "canonical": "rgba(255, 255, 255, 0.04)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(255, 255, 255, 0.08)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Firm Hairline",
+        "canonical": "rgba(255, 255, 255, 0.14)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "text-2": {
+        "role": "neutral",
+        "displayName": "Soft White",
+        "canonical": "rgba(255, 255, 255, 0.64)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "text-3": {
+        "role": "neutral",
+        "displayName": "Dim White",
+        "canonical": "rgba(255, 255, 255, 0.5)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "ok": {
+        "role": "state",
+        "displayName": "Signal Green",
+        "canonical": "#4ade80",
+        "tonalRamp": [
+          "#001003",
+          "#002f0f",
+          "#00521f",
+          "#007831",
+          "#009f46",
+          "#53be76",
+          "#91dea5",
+          "#cafed6"
+        ]
+      },
+      "warn": {
+        "role": "state",
+        "displayName": "Signal Red",
+        "canonical": "#f87171",
+        "tonalRamp": [
+          "#190404",
+          "#421314",
+          "#6f2527",
+          "#a03a3c",
+          "#d35153",
+          "#ed817f",
+          "#ffafab",
+          "#ffddda"
+        ]
+      },
+      "warn-text": {
+        "role": "state",
+        "displayName": "Soft Red",
+        "canonical": "#fca5a5",
+        "tonalRamp": [
+          "#150707",
+          "#381b1c",
+          "#603334",
+          "#8b4c4d",
+          "#b86869",
+          "#d49090",
+          "#f0b9b9",
+          "#ffe4e3"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Placement figure in amber, once per screen."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "BG/MS mark in the app bar, uppercase italic; 12px in the HUD brand cell."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Match heading (map name)."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel and onboarding headings, status values."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Notes, onboarding steps, button text; result sentence at 15px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase field, status, and diagnostic labels."
+      },
+      "hud-value": {
+        "displayName": "HUD Value",
+        "purpose": "In-game counter values."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Raw diagnostic identifiers only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hud-lift",
+        "value": "0 2px 10px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08)",
+        "purpose": "Mini HUD band over the game image."
+      },
+      {
+        "name": "hud-text-halo",
+        "value": "text-shadow: 0 1px 2px rgba(0,0,0,0.95), 0 0 6px rgba(0,0,0,0.8)",
+        "purpose": "HUD status line, which has no background."
+      },
+      {
+        "name": "keycap",
+        "value": "inset 0 -1px 0 rgba(0,0,0,0.6), inset 0 0 0 1px rgba(255,255,255,0.14)",
+        "purpose": "Hotkey values."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "All state transitions."
+      },
+      {
+        "name": "duration-hover",
+        "value": "150ms",
+        "purpose": "Button, pill, and status-cell hover."
+      },
+      {
+        "name": "duration-toggle",
+        "value": "200ms",
+        "purpose": "Toggle knob and disclosure chevron."
+      },
+      {
+        "name": "lamp-pulse",
+        "value": "1.8s ease-in-out infinite, opacity 1 to 0.35",
+        "purpose": "Live status lamp only."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "animation and transition none",
+        "purpose": "prefers-reduced-motion: reduce disables all motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "desktop-min",
+        "value": "1000px x 560px"
+      },
+      {
+        "name": "desktop-default",
+        "value": "1200px x 720px"
+      },
+      {
+        "name": "layout-max",
+        "value": "1400px"
+      },
+      {
+        "name": "in-game-window",
+        "value": "348px x 78px"
+      }
+    ],
+    "constraints": [
+      "Overwolf ad container 400x300, no children besides SDK output, transparent background, always visible, never beside a settings-only view.",
+      "In-game window 348x78, transparent, click-through; 11px text floor.",
+      "Desktop window minimum 1000x560.",
+      "English default; Korean optional via i18n.js and the BGMS Korean font subset."
+    ]
+  },
+  "components": [
+    {
+      "name": "App Bar",
+      "kind": "nav",
+      "refersTo": "app-bar",
+      "description": "bgms.kr header at companion scale; wordmark, app name, language pills, close.",
+      "html": "<header class=\"ds-bar\"><span class=\"ds-wordmark\">BG<span>MS</span></span><span class=\"ds-bar-name\">Companion</span><nav class=\"ds-lang\"><button class=\"is-selected\" type=\"button\">English</button><button type=\"button\">Korean</button></nav><button class=\"ds-icon\" type=\"button\" aria-label=\"Close\"><svg viewBox=\"0 0 16 16\" width=\"16\" height=\"16\" aria-hidden=\"true\"><path d=\"M4 4l8 8M12 4l-8 8\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/></svg></button></header>",
+      "css": ".ds-bar{display:flex;align-items:center;gap:10px;height:48px;padding:0 12px 0 20px;border-bottom:2px solid var(--accent-rule,#cc8b00);background:var(--accent,#f2a900);color:#000;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-wordmark{font-size:21px;font-style:italic;font-weight:900;letter-spacing:-0.04em;line-height:1;text-transform:uppercase}.ds-wordmark span{color:#fff}.ds-bar-name{padding-left:10px;border-left:1px solid rgba(0,0,0,.25);font-size:13px;font-weight:700}.ds-lang{display:flex;gap:2px;margin-left:auto}.ds-lang button{height:30px;padding:0 11px;border:0;border-radius:8px;background:transparent;color:rgba(0,0,0,.72);font:inherit;font-size:11px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1)}.ds-lang button:hover{background:rgba(0,0,0,.1);color:#000}.ds-lang button.is-selected{background:#000;color:var(--accent,#f2a900)}.ds-icon{display:grid;width:32px;height:32px;place-items:center;border:0;border-radius:8px;background:transparent;color:#000;cursor:pointer}.ds-icon:hover{background:rgba(0,0,0,.12)}.ds-bar :focus-visible{outline:2px solid #000;outline-offset:2px}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one amber action per view: replay this match on BGMS.",
+      "html": "<button class=\"ds-btn ds-btn-primary\" type=\"button\">Replay this match</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid var(--line-strong,rgba(255,255,255,.14));border-radius:8px;background:var(--elevated,#1f1f1f);color:#fff;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);font-size:13px;font-weight:700;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1),transform 150ms cubic-bezier(.16,1,.3,1)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:2px solid var(--accent,#f2a900);outline-offset:2px}.ds-btn-primary{border-color:var(--accent-rule,#cc8b00);background:var(--accent,#f2a900);color:#000;font-weight:800}.ds-btn-primary:hover{background:#ffb914}"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Every other action; raised carbon with a firm hairline.",
+      "html": "<button class=\"ds-btn2\" type=\"button\">Open my session history</button>",
+      "css": ".ds-btn2{display:inline-flex;align-items:center;height:36px;padding:0 14px;border:1px solid var(--line-strong,rgba(255,255,255,.14));border-radius:8px;background:var(--elevated,#1f1f1f);color:#fff;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);font-size:13px;font-weight:700;cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1),border-color 150ms cubic-bezier(.16,1,.3,1)}.ds-btn2:hover{border-color:rgba(255,255,255,.24);background:#262626}.ds-btn2:active{transform:translateY(1px)}.ds-btn2:focus-visible{outline:2px solid var(--accent,#f2a900);outline-offset:2px}.ds-btn2:disabled{border-color:rgba(255,255,255,.08);background:#161616;color:rgba(255,255,255,.5);cursor:not-allowed}"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "text-input",
+      "description": "Nickname field: night ground, firm hairline, amber caret and focus ring.",
+      "html": "<label class=\"ds-field\"><span>BGMS nickname</span><input type=\"text\" placeholder=\"PUBG in-game name\"></label>",
+      "css": ".ds-field{display:grid;gap:8px;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-field span{color:rgba(255,255,255,.5);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.ds-field input{height:38px;padding:0 12px;border:1px solid var(--line-strong,rgba(255,255,255,.14));border-radius:8px;background:var(--bg,#0d0d0d);color:#fff;font:inherit;font-size:14px;caret-color:var(--accent,#f2a900)}.ds-field input::placeholder{color:rgba(255,255,255,.5)}.ds-field input:focus-visible{border-color:var(--accent,#f2a900);outline:none;box-shadow:inset 0 0 0 1px var(--accent,#f2a900)}"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "chip",
+      "refersTo": "segmented-option",
+      "description": "Exclusive choice (platform, overlay mode, position); selected option goes amber.",
+      "html": "<div class=\"ds-seg\" role=\"group\"><button type=\"button\" class=\"is-selected\">Steam</button><button type=\"button\">Kakao</button></div>",
+      "css": ".ds-seg{display:inline-flex;gap:2px;padding:3px;border-radius:9px;background:var(--bg,#0d0d0d);box-shadow:inset 0 0 0 1px var(--line,rgba(255,255,255,.08));font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-seg button{height:30px;padding:0 12px;border:0;border-radius:6px;background:transparent;color:rgba(255,255,255,.64);font:inherit;font-size:12px;font-weight:700;cursor:pointer}.ds-seg button:hover{color:#fff}.ds-seg button:focus-visible{outline:2px solid var(--accent,#f2a900);outline-offset:2px}.ds-seg button.is-selected{background:var(--accent,#f2a900);color:#000}"
+    },
+    {
+      "name": "Status Strip",
+      "kind": "custom",
+      "refersTo": "status-strip",
+      "description": "Three-cell lamp strip: off, on, live (pulsing amber), warn.",
+      "html": "<section class=\"ds-strip\"><div class=\"ds-cell\" data-tone=\"on\"><span class=\"ds-lbl\">PUBG</span><span class=\"ds-val\"><i class=\"ds-lamp\"></i>Ready</span></div><button type=\"button\" class=\"ds-cell\" data-tone=\"live\"><span class=\"ds-lbl\">Overlay</span><span class=\"ds-val\"><i class=\"ds-lamp\"></i>In match</span></button><button type=\"button\" class=\"ds-cell\" data-tone=\"warn\"><span class=\"ds-lbl\">Session handoff</span><span class=\"ds-val\"><i class=\"ds-lamp\"></i>Needs nickname</span></button></section>",
+      "css": ".ds-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border:1px solid var(--line,rgba(255,255,255,.08));border-radius:10px;background:var(--surface,#161616);overflow:hidden;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-cell{display:grid;gap:6px;padding:14px 16px;border:0;background:transparent;color:#fff;font:inherit;text-align:left}.ds-cell+.ds-cell{border-left:1px solid var(--line,rgba(255,255,255,.08))}button.ds-cell{cursor:pointer;transition:background-color 150ms cubic-bezier(.16,1,.3,1)}button.ds-cell:hover{background:rgba(255,255,255,.04)}button.ds-cell:focus-visible{outline:2px solid var(--accent,#f2a900);outline-offset:-2px}.ds-lbl{color:rgba(255,255,255,.5);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}.ds-val{display:flex;align-items:center;gap:8px;font-size:15px;font-weight:700}.ds-lamp{width:8px;height:8px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.5)}[data-tone=on] .ds-lamp{background:#4ade80;box-shadow:none}[data-tone=live] .ds-lamp{background:#f2a900;box-shadow:none;animation:ds-pulse 1.8s ease-in-out infinite}[data-tone=warn] .ds-lamp{background:#f87171;box-shadow:none}[data-tone=warn] .ds-val{color:#fca5a5}@keyframes ds-pulse{50%{opacity:.35}}"
+    },
+    {
+      "name": "Moment Track",
+      "kind": "custom",
+      "refersTo": "match-card",
+      "description": "Signature: match-length rail with knock, revive, bookmark, and death marks at elapsed time.",
+      "html": "<div class=\"ds-track\"><span class=\"ds-tick\" style=\"left:0\"><b style=\"left:0;transform:none\">0:00</b></span><span class=\"ds-m ds-ko\" style=\"left:30%\"><b>6:42</b></span><span class=\"ds-m ds-rv\" style=\"left:52%\"><b>11:40</b></span><span class=\"ds-m ds-bm\" style=\"left:74%\"><b>16:30</b></span><span class=\"ds-m ds-dt\" style=\"left:100%\"><b>22:10</b></span></div>",
+      "css": ".ds-track{position:relative;height:58px;margin:22px 8px 0;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-track::before{position:absolute;top:9px;left:0;right:0;height:2px;border-radius:2px;background:rgba(255,255,255,.14);content:''}.ds-m,.ds-tick{position:absolute;top:10px;width:12px;height:12px;margin-left:-6px;transform:translateY(-50%)}.ds-m b,.ds-tick b{position:absolute;top:16px;left:50%;color:rgba(255,255,255,.64);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap;transform:translateX(-50%)}.ds-tick{width:2px;margin-left:-1px;background:rgba(255,255,255,.5)}.ds-tick b{color:rgba(255,255,255,.5)}.ds-ko{border:2.5px solid #f2a900;border-radius:50%;background:#161616}.ds-rv{border:2.5px solid #4ade80;border-radius:50%;background:#161616}.ds-bm::before{position:absolute;inset:1px;background:#fff;content:'';transform:rotate(45deg)}.ds-dt{width:4px;height:20px;margin-left:-2px;border-radius:2px;background:#f87171}.ds-dt b{top:20px;color:#fca5a5;font-weight:800}"
+    },
+    {
+      "name": "Mini HUD",
+      "kind": "custom",
+      "refersTo": "mini-hud",
+      "description": "In-game band: brand cell, phase, counters the PUBG HUD lacks, KO flag.",
+      "html": "<div class=\"ds-hud\"><span class=\"ds-hb\">BGMS</span><span class=\"ds-hp\">Ended</span><span class=\"ds-hi\"><span>HS</span><strong>2</strong></span><span class=\"ds-hi\"><span>Longest</span><strong>163m</strong></span><span class=\"ds-hi\"><span>Place</span><strong>3/98</strong></span></div>",
+      "css": ".ds-hud{display:flex;align-items:stretch;width:340px;height:30px;border-radius:8px;background:rgba(13,13,13,.82);box-shadow:0 2px 10px rgba(0,0,0,.45),inset 0 0 0 1px rgba(255,255,255,.08);overflow:hidden;white-space:nowrap;color:#fff;font-family: var(--font, \"Outfit\", \"BGMS Korean\", \"Pretendard\", \"Segoe UI\", sans-serif);}.ds-hb{display:grid;place-items:center;padding:0 7px;background:#f2a900;color:#000;font-size:12px;font-style:italic;font-weight:900;letter-spacing:-.03em}.ds-hp{align-self:center;padding:0 7px;color:#f2a900;font-size:11px;font-weight:800;text-transform:uppercase}.ds-hi{display:inline-flex;align-items:baseline;align-self:center;gap:4px;min-width:0;padding:0 7px;border-left:1px solid rgba(255,255,255,.1)}.ds-hi span{overflow:hidden;color:rgba(255,255,255,.64);font-size:11px;font-weight:700;text-overflow:ellipsis;text-transform:uppercase}.ds-hi strong{flex:none;font-size:13px;font-weight:800;font-variant-numeric:tabular-nums}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shrunken Shell",
+    "overview": "The companion is bgms.kr carried down to a desktop window and a strip of HUD: the same amber header bar with its darker rule, the same BG/MS wordmark, the same near-black grounds and Outfit type, so a player moving from the app to the web replay feels no seam. Nothing here is a new brand; it is the web brand at companion scale.\n\nDensity is calm and operational. The desktop window reads top to bottom as one status strip, then the latest match, then collapsed settings. One amber number (the placement) and one amber button (the replay) carry the screen; everything else is white, grey, or hairline. The in-game HUD is a single translucent dark band, glanceable and silent, showing only what PUBG's own HUD does not.\n\nThe system refuses the settings-form-first utility window and the hero-metric card grid. Settings live behind a disclosure; numbers that matter sit in one inline sentence rather than a row of stat tiles.",
+    "keyCharacteristics": [
+      "Amber bar (48px) with a 2px darker-amber bottom rule, black text, BG black / MS white italic wordmark.",
+      "Three near-black grounds layered by tone, separated by white hairlines; no drop shadows on the desktop window.",
+      "Amber is reserved for the brand bar, the placement, the primary action, selected states, and focus.",
+      "The moment track: a hairline match-length rail with knock, death, revive, and bookmark marks at their elapsed time.",
+      "English first; Korean set in a renamed Pretendard subset (\"BGMS Korean\") behind Outfit in the same stack."
+    ],
+    "rules": [
+      {
+        "name": "The Two Amber Moments Rule",
+        "body": "On the desktop window's main view, amber appears in the bar and in at most two content places: the placement figure and the primary replay button. Selected controls and focus inherit amber, but no decorative amber.",
+        "section": "colors"
+      },
+      {
+        "name": "The Lamp Grammar Rule",
+        "body": "Status is told by a lamp of four tones only: off (hollow grey ring), on (green), live (amber, pulsing 1.8s), warn (red with soft-red value text). New statuses map to one of these four; no new colors.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Every number a player compares (placement, headshots, longest kill, moment times, hotkeys, HUD counters, slider value) is set with tabular figures.",
+        "section": "typography"
+      },
+      {
+        "name": "The Eleven Pixel Floor Rule",
+        "body": "No text anywhere, desktop or HUD, is set below 11px.",
+        "section": "typography"
+      },
+      {
+        "name": "The Ad Rail Rule",
+        "body": "The Overwolf ad container is exactly 400x300, has no children other than what the ad SDK inserts, keeps a transparent background, and is always visible. It never sits beside a view that is only settings; settings stay a collapsible part of the status-and-match view.",
+        "section": "layout"
+      },
+      {
+        "name": "The Flat Window Rule",
+        "body": "Nothing on the desktop window casts a shadow. If a surface needs separation, step its tone or add a hairline.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep the app bar identical to bgms.kr: amber fill, 2px darker-amber rule, BG black / MS white italic wordmark.",
+      "**Do** separate surfaces by tone step and 1px white hairline only.",
+      "**Do** set every comparable number in tabular figures.",
+      "**Do** keep all text at 11px or larger, including the HUD.",
+      "**Do** keep the ad slot at 400x300, empty, transparent, and always beside the status-and-match view.",
+      "**Do** write every string in English first and add Korean through i18n; regenerate the Korean font subset when Korean strings change.",
+      "**Do** let HUD labels truncate before values."
+    ],
+    "donts": [
+      "**Don't** add drop shadows to the desktop window; shadows belong only to the HUD over the game.",
+      "**Don't** introduce colors outside the token set; state uses only green, red, soft red, and amber.",
+      "**Don't** show the ad rail beside a view that is only settings.",
+      "**Don't** lay out match numbers as a grid of stat tiles; they read as one sentence beside the placement.",
+      "**Don't** add HUD items that repeat what PUBG's own HUD shows (kills, alive count, health, weapon, kill feed).",
+      "**Don't** draw moment marks or icons with text glyphs; use CSS shapes or inline SVG."
+    ]
+  }
+}
