@@ -7,49 +7,87 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body class="desktop-shell">
-    <main class="desktop-page">
-      <div class="desktop-titlebar" id="desktop-drag-handle" aria-label="Move BGMS Companion window" data-i18n-title="desktopDragHint" title="Drag to move window">
-        <span>BGMS Companion</span>
-        <div class="desktop-titlebar-actions">
-          <nav class="language-switcher" aria-label="Language">
-            <span data-i18n="languageLabel">Language</span>
-            <button type="button" data-language="en" aria-pressed="true" data-i18n="languageEnglish">English</button>
-            <button type="button" data-language="ko" aria-pressed="false" data-i18n="languageKorean">Korean</button>
-          </nav>
-          <button type="button" id="desktop-close" data-i18n-aria-label="closeDesktop" data-i18n-title="closeDesktop" aria-label="Close" title="Close">×</button>
-        </div>
+    <!-- bgms.kr GlobalHeader 와 같은 앰버 바. 창 이동 핸들을 겸한다. -->
+    <header class="app-bar" id="desktop-drag-handle" data-i18n-title="desktopDragHint" title="Drag to move window">
+      <span class="wordmark" aria-label="BGMS">BG<span>MS</span></span>
+      <span class="app-bar-name">Companion</span>
+      <div class="app-bar-actions">
+        <nav class="language-switcher" aria-label="Language">
+          <button type="button" data-language="en" aria-pressed="true" data-i18n="languageEnglish">English</button>
+          <button type="button" data-language="ko" aria-pressed="false" data-i18n="languageKorean">Korean</button>
+        </nav>
+        <button type="button" class="icon-button" id="desktop-close" data-i18n-aria-label="closeDesktop" data-i18n-title="closeDesktop" aria-label="Close" title="Close">
+          <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
       </div>
+    </header>
 
-      <section class="desktop-hero" aria-labelledby="app-title">
-        <img src="assets/bgms-icon.svg" alt="" class="desktop-logo">
-        <div>
-          <p class="eyebrow" data-i18n="desktopEyebrow">BGMS Companion for PUBG</p>
-          <h1 id="app-title" data-i18n="desktopTitle">Live match context, clean post-match handoff.</h1>
-          <p class="lede" data-i18n="desktopLede">
-            BGMS Companion shows a compact in-game status overlay and prepares a session summary for BGMS after the match ends.
-          </p>
-        </div>
-      </section>
+    <div class="desktop-layout">
+      <main class="desktop-content">
+        <!-- 앱이 제대로 도는지 한 줄로 보여주는 상태 띠. 칸마다 램프와 한 단어 상태. -->
+        <section class="status-strip" aria-label="App status">
+          <div class="status-cell" id="status-game-cell" data-tone="off">
+            <span class="status-label" data-i18n="statusGameLabel">PUBG</span>
+            <span class="status-value"><i class="lamp" aria-hidden="true"></i><span id="status-game">Not running</span></span>
+          </div>
+          <button type="button" class="status-cell" id="status-overlay-cell" data-tone="off" data-i18n-title="statusOverlayHint" title="Show or hide the in-game overlay">
+            <span class="status-label" data-i18n="statusOverlayLabel">Overlay</span>
+            <span class="status-value"><i class="lamp" aria-hidden="true"></i><span id="status-overlay">Hidden</span></span>
+          </button>
+          <button type="button" class="status-cell" id="status-handoff-cell" data-tone="off" data-i18n-title="statusHandoffHint" title="Open session handoff settings">
+            <span class="status-label" data-i18n="handoffLabel">Session handoff</span>
+            <span class="status-value"><i class="lamp" aria-hidden="true"></i><span id="status-handoff">Off</span></span>
+          </button>
+        </section>
 
-      <!--
-        첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
-        전송을 켜고 닉네임을 넣으면 desktop.js 가 이 영역을 숨긴다.
-      -->
-      <section class="onboarding is-hidden" id="onboarding" aria-labelledby="onboarding-title">
-        <h2 id="onboarding-title" data-i18n="onboardingTitle">Two steps to get started</h2>
-        <ol class="onboarding-steps">
-          <li>
-            <span class="onboarding-step" id="onboarding-step-1" data-i18n="onboardingStepConsent">Turn on session handoff below and enter your PUBG nickname.</span>
-          </li>
-          <li>
-            <span class="onboarding-step" data-i18n="onboardingStepPlay">Play a match. When it ends, the summary travels to BGMS on its own.</span>
-          </li>
-        </ol>
-        <p class="onboarding-note" data-i18n="onboardingNote">
-          Nothing is sent until you turn it on. The overlay works either way, and you can open it in a match with the hotkey listed under overlay settings.
-        </p>
-      </section>
+        <section class="match" aria-labelledby="match-card-title">
+          <header class="match-head">
+            <h1 id="match-card-title"><span id="match-card-map" data-i18n="matchCardTitle">Latest match</span><span class="match-mode" id="match-card-mode"></span></h1>
+            <span class="match-status" id="match-card-status" data-i18n="matchCardEmpty">No match yet</span>
+          </header>
+          <div class="match-result">
+            <span class="match-placement" id="match-card-placement" data-i18n-title="matchCardPlacement" title="Placement">--</span>
+            <p class="match-line">
+              <span data-i18n="matchCardHeadshots">Headshots</span> <strong id="match-card-headshots">--</strong>
+              <span class="match-sep" aria-hidden="true"></span>
+              <span data-i18n="matchCardLongest">Longest kill</span> <strong id="match-card-longest">--</strong>
+            </p>
+          </div>
+          <!-- 매치 길이 레일 위에 기절·사망·부활·북마크를 경과 시각 자리에 찍는다 -->
+          <div class="moment-track is-empty" id="match-track" aria-hidden="true"></div>
+          <p class="visually-hidden" id="match-card-moments">--</p>
+          <div class="match-actions">
+            <button type="button" id="match-card-review" class="button is-primary" data-i18n="matchCardReplay" disabled>Replay this match</button>
+            <button type="button" id="open-session-history" class="button" data-i18n="openSessionHistory">Open my session history</button>
+          </div>
+          <p class="match-hint" id="match-card-hint"></p>
+        </section>
 
+        <!--
+            첫 실행 안내(FTUE). 공식 Best Practices 권고 항목이다.
+            전송을 켜고 닉네임을 넣으면 desktop.js 가 이 영역을 숨긴다.
+          -->
+          <section class="onboarding is-hidden" id="onboarding" aria-labelledby="onboarding-title">
+            <h2 id="onboarding-title" data-i18n="onboardingTitle">Two steps to get started</h2>
+            <ol class="onboarding-steps">
+              <li>
+                  <span class="onboarding-step" id="onboarding-step-1" data-i18n="onboardingStepConsent">Turn on session handoff below and enter your PUBG nickname.</span>
+              </li>
+              <li>
+                  <span class="onboarding-step" data-i18n="onboardingStepPlay">Play a match. When it ends, the summary travels to BGMS on its own.</span>
+              </li>
+            </ol>
+            <p class="onboarding-note" data-i18n="onboardingNote">
+              Nothing is sent until you turn it on. The overlay works either way, and you can open it in a match with the hotkey listed under overlay settings.
+            </p>
+          </section>
+
+        <!--
+          광고 정책상 설정 페이지에는 광고를 둘 수 없다. 이 창의 주 화면은 상태와 매치이고,
+          설정은 접힘 영역으로 둔다. 설정이 끝나지 않았으면 desktop.js 가 펼친다.
+        -->
+        <details class="settings-disclosure" id="settings-disclosure">
+          <summary><h2 data-i18n="settingsDisclosureTitle">Settings</h2></summary>
       <section class="settings-grid" aria-label="Overlay settings">
         <article class="panel handoff-panel">
           <h2 data-i18n="handoffTitle">BGMS session handoff</h2>
@@ -77,8 +115,7 @@
 
           <p class="handoff-status" id="handoff-status" role="status"></p>
           <div class="button-row">
-            <button type="button" id="handoff-retry" class="text-button" data-i18n="handoffRetry">Retry pending handoff</button>
-            <button type="button" id="open-session-history" class="text-button is-primary" data-i18n="openSessionHistory">Open my session history</button>
+            <button type="button" id="handoff-retry" class="button" data-i18n="handoffRetry">Retry pending handoff</button>
           </div>
         </article>
 
@@ -96,8 +133,12 @@
                 <dt data-i18n="hotkeyOpenDesktop">Open this window</dt>
                 <dd id="hotkey-open-desktop">--</dd>
               </div>
+              <div>
+                <dt data-i18n="hotkeyMarkMoment">Bookmark this moment</dt>
+                <dd id="hotkey-mark-moment">--</dd>
+              </div>
             </dl>
-            <button type="button" id="edit-hotkeys" class="text-button" data-i18n="editHotkeys">Change in Overwolf settings</button>
+            <button type="button" id="edit-hotkeys" class="button" data-i18n="editHotkeys">Change in Overwolf settings</button>
           </div>
 
           <div class="control-group">
@@ -190,44 +231,33 @@
               <dd id="desktop-required-result" class="diagnostic-wrap">--</dd>
             </div>
             </dl>
-            <button type="button" id="desktop-refresh" class="text-button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
+            <button type="button" id="desktop-refresh" class="button" data-i18n="refreshDiagnostics">Refresh diagnostics</button>
           </details>
         </article>
       </section>
+        </details>
 
-      <section class="desktop-grid" aria-label="App status">
-        <article class="panel">
-          <h2 data-i18n="phaseScopeTitle">Phase 1 scope</h2>
-          <ul class="scope-list">
-            <li data-i18n="phaseScopeMatch">Match start and match end state</li>
-            <li data-i18n="phaseScopeState">Phase, local health, weapon state</li>
-            <li data-i18n="phaseScopeEvents">Kills, deaths, revives, killer notice</li>
-            <li data-i18n="phaseScopeRoster">Roster-based alive player count</li>
-          </ul>
-        </article>
+        <footer class="desktop-footer">
+          <span data-i18n="footerHelp">Questions or feedback?</span>
+          <button type="button" id="open-community" class="link-button" data-i18n="footerCommunity">BGMS community</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" id="open-discord" class="link-button" data-i18n="footerDiscord">Discord</button>
+        </footer>
+      </main>
 
-        <article class="panel">
-          <h2 data-i18n="guardrailsTitle">Policy guardrails</h2>
-          <ul class="scope-list">
-            <li data-i18n="guardrailDamage">No real-time damage meter</li>
-            <li data-i18n="guardrailLocation">No live location or minimap</li>
-            <li data-i18n="guardrailPubgApi">No PUBG API calls from live GEP triggers</li>
-            <li data-i18n="guardrailSecrets">No service role or Supabase secrets in the app</li>
-          </ul>
-        </article>
-      </section>
-
-      <footer class="desktop-footer">
-        <span data-i18n="footerHelp">Questions or feedback?</span>
-        <button type="button" id="open-community" class="link-button" data-i18n="footerCommunity">BGMS community</button>
-        <span aria-hidden="true">·</span>
-        <button type="button" id="open-discord" class="link-button" data-i18n="footerDiscord">Discord</button>
-      </footer>
-    </main>
+      <!--
+        Overwolf 광고 컨테이너. 정책상 SDK 가 만든 요소 외 자식을 두지 않고 항상 보이게 둔다.
+        크기는 ads.js 가 요청하는 400x300 광고 단위와 같다.
+      -->
+      <aside class="ad-rail" aria-label="Advertisement">
+        <div id="bgms-ad-desktop" class="ad-slot"></div>
+      </aside>
+    </div>
 
     <script src="i18n.js"></script>
     <script src="settings.js"></script>
     <script src="gep-state.js"></script>
     <script src="desktop.js"></script>
+    <script src="ads.js"></script>
   </body>
 </html>

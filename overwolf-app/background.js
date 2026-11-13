@@ -29,6 +29,8 @@
   var SESSION_ENDPOINT = window.bgmsDevEndpoint || "https://bgms.kr/api/overwolf/session";
   // 사용자가 데스크탑 창에서 세션 기록을 열 때 사용하는 웹 경로.
   var SESSION_WEB_BASE = window.bgmsDevWebBase || "https://bgms.kr/overwolf/sessions";
+  // 끝난 매치를 바로 여는 BGMS 3D 리플레이 경로.
+  var REPLAY_WEB_BASE = window.bgmsDevReplayBase || "https://bgms.kr/replay/3d";
   /*
    * 앱에서 열 수 있는 외부 링크. 화이트리스트로 두어 임의 URL 이 열리지 않게 한다.
    * community 는 BGMS 게시판, discord 는 공식 서버다.
@@ -190,6 +192,8 @@
   function setOverlayVisible(nextVisible) {
     if (overlayVisible === nextVisible) return;
     overlayVisible = nextVisible;
+    // 데스크탑 창 상태 띠가 오버레이 표시 여부를 보여줄 수 있게 상태에도 남긴다.
+    patchState({ overlayVisible: overlayVisible });
 
     if (overlayVisible) {
       showWindow(IN_GAME_WINDOW);
@@ -892,6 +896,18 @@
 
       if (!hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
         return null;
+      }
+
+      overwolf.utils.openUrlInDefaultBrowser(url);
+
+      return url;
+    },
+    // 최근 매치를 BGMS 맵 리플레이로 연다. 공식 match_id 와 닉네임이 없으면 열지 않는다.
+    openMatchReplay: function () {
+      var url = gepState.buildReplayUrl(REPLAY_WEB_BASE, state, settingsStore.read());
+
+      if (!url || !hasBaseOverwolfApi() || !overwolf.utils || !overwolf.utils.openUrlInDefaultBrowser) {
+        return url;
       }
 
       overwolf.utils.openUrlInDefaultBrowser(url);

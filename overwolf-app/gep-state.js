@@ -897,6 +897,36 @@
     }, state);
   }
 
+  var MATCH_UUID_PATTERN = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+  /*
+   * 끝난 매치의 BGMS 3D 리플레이 주소. bgms.kr lib/overwolf/session-view.ts 의 buildReplayPath 와
+   * 같은 쿼리(matchId=UUID, nickname, platform, t)를 쓴다. 공식 match_id 의 마지막 UUID 가 텔레메트리 키다.
+   * 사망 기록이 있으면 마지막 사망 시각으로, 없으면 처음부터 연다. 시각은 로컬 시계 기준 근사값이다.
+   */
+  function buildReplayUrl(base, state, settings) {
+    var uuids = state && state.matchId ? String(state.matchId).match(MATCH_UUID_PATTERN) : null;
+    var deaths;
+    var query;
+
+    if (!uuids || !state.matchEnded || !settings || !settings.playerName) {
+      return null;
+    }
+
+    query = "matchId=" + encodeURIComponent(uuids[uuids.length - 1].toLowerCase())
+      + "&nickname=" + encodeURIComponent(settings.playerName)
+      + "&platform=" + encodeURIComponent(settings.platform || "steam");
+    deaths = (state.eventTimeline || []).filter(function (entry) {
+      return entry.kind === "death" && typeof entry.t === "number" && entry.t >= 0;
+    });
+
+    if (deaths.length) {
+      query += "&t=" + Math.round(deaths[deaths.length - 1].t);
+    }
+
+    return base + "?" + query;
+  }
+
   // 매치당 사용자 북마크 상한. 타임라인 40개 상한 안에서 자동 이벤트 자리를 남긴다.
   var MAX_BOOKMARKS = 10;
 
@@ -1144,6 +1174,7 @@
     buildSessionSummary: buildSessionSummary,
     isSummaryPending: isSummaryPending,
     reduceBookmark: reduceBookmark,
+    buildReplayUrl: buildReplayUrl,
     MAX_BOOKMARKS: MAX_BOOKMARKS,
     safeParse: safeParse,
     summarizeValue: summarizeValue

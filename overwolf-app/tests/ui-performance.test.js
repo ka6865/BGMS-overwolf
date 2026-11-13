@@ -273,7 +273,9 @@ function createDesktopSandbox() {
     "desktop-service-status", "desktop-game-status", "desktop-match-id", "desktop-last-event",
     "desktop-recent-updates", "desktop-seen-features", "desktop-supported-features",
     "desktop-missing-updates", "desktop-ignored-updates", "desktop-gep-version", "desktop-gep-error",
-    "desktop-handoff", "desktop-required-result", "hotkey-toggle-overlay", "hotkey-open-desktop"
+    "desktop-handoff", "desktop-required-result", "hotkey-toggle-overlay", "hotkey-open-desktop",
+    "match-card-status", "match-card-map", "match-card-placement", "match-card-headshots",
+    "match-card-longest", "match-card-moments", "match-card-review", "match-card-hint", "match-card-mode"
   ]);
   const sandbox = {
     document: document,
@@ -375,6 +377,44 @@ test("desktop shows an explicit unassigned hotkey without hiding it behind the m
   ui.controller.setAssignedHotkeys(null);
   ui.hotkeyHub.emit();
   assert.equal(ui.document.elements["hotkey-toggle-overlay"].textContent, "Ctrl+Shift+B");
+});
+
+test("desktop match card shows the finished match and enables review only with handoff and an official match id", () => {
+  const ui = createDesktopSandbox();
+  const state = Object.assign(createState("Match ended"), {
+    matchStartedAt: "2026-11-13T00:00:00.000Z",
+    matchEnded: true,
+    matchId: "match.bro.official.pc-2018-36.steam.squad.as.2026.11.13.00.abc",
+    mapName: "Baltic_Main",
+    rankPlace: 3,
+    rankTotal: 98,
+    maxKillDistance: 163.17,
+    eventTimeline: [
+      { t: 65, kind: "kill" },
+      { t: 192, kind: "knockedout" },
+      { t: 220, kind: "death" }
+    ]
+  });
+
+  ui.sandbox.bgmsGepState.buildReplayUrl = require("../gep-state.js").buildReplayUrl;
+  ui.controller.emit(state);
+  assert.equal(ui.document.elements["match-card-status"].textContent, "matchCardEnded");
+  assert.equal(ui.document.elements["match-card-map"].textContent, "Erangel");
+  assert.equal(ui.document.elements["match-card-placement"].textContent, "#3 / 98");
+  assert.equal(ui.document.elements["match-card-longest"].textContent, "163m");
+  assert.equal(ui.document.elements["match-card-moments"].textContent, "momentKnocked 3:12 · momentDeath 3:40");
+  assert.equal(ui.document.elements["match-card-review"].disabled, true);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintNickname");
+  assert.equal(ui.document.elements["match-card-review"].textContent, "matchCardReplayDeath");
+
+  ui.sandbox.bgmsSettings.read = () => ({ handoffEnabled: false, playerName: "Player", platform: "steam" });
+  ui.controller.emit(Object.assign({}, state, { matchId: "" }));
+  assert.equal(ui.document.elements["match-card-review"].disabled, true);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintMatchId");
+
+  ui.controller.emit(Object.assign({}, state, { matchId: "match.bro.official.pc-2018-36.steam.squad.as.2026.11.13.00.ce8d1a14-b2af-41c8-8bf4-d2a504326630" }));
+  assert.equal(ui.document.elements["match-card-review"].disabled, false);
+  assert.equal(ui.document.elements["match-card-hint"].textContent, "matchCardHintReplay");
 });
 
 function createAdsSandbox() {

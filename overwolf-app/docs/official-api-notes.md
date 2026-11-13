@@ -494,3 +494,10 @@ manifest의 `minimum-overwolf-version`이 `0.170.0`이므로 그 클라이언트
 - 데스크탑 창의 주 화면은 최근 매치 카드다. 설정은 접힘 영역(`settings-disclosure`)으로 옮겼고, 설정이 끝나지 않았을 때만 자동으로 펼친다. 설정 화면이 열린 상태에서 광고가 함께 보이는 것을 Overwolf QA가 문제 삼을 수 있으므로 심사 피드백을 확인한다.
 - 모든 기능은 광고와 무관하게 무료다(PUBG API Exclusive Access 금지). 광고 제거 구독은 아직 구현하지 않았다.
 - 북마크 핫키 `mark_moment`(기본 `Ctrl+Shift+M`)는 진행 중 매치에서만, 매치당 10개까지 타임라인에 `bookmark`를 남긴다. 서버는 모르는 kind를 422 없이 버리므로, 웹 저장소에서 `bookmark` 허용이 배포되기 전까지는 전송돼도 저장되지 않는다.
+
+## 디자인 개편과 리플레이 바로가기 (2026-11-13)
+
+- 데스크탑 창과 HUD를 bgms.kr 브랜드(앰버 #F2A900 바, BG/MS 워드마크, 검정 바탕, Outfit)로 다시 만들었다. 기준은 `PRODUCT.md`, `DESIGN.md`, `.impeccable/surfaces/overwolf-app-desktop-html.md`.
+- 최근 매치의 주 버튼은 BGMS 3D 리플레이를 바로 연다: `https://bgms.kr/replay/3d?matchId=<GEP match_id 끝 UUID>&nickname&platform&t=<마지막 사망 초>`. 웹 `lib/overwolf/session-view.ts`의 `buildReplayPath`와 같은 쿼리다. `t`는 로컬 시계 기준 근사값이다. 전송 동의 없이 닉네임과 공식 match_id만 있으면 열린다. 실제 bgms.kr 페이지에서 열어 보는 확인은 아직 하지 않았다.
+- 폰트: Outfit(라틴, OFL)과 Pretendard 1.3.9의 한글 서브셋을 앱에 싣는다. 서브셋은 OFL 예약 폰트 이름 조건 때문에 "BGMS Korean"으로 이름을 바꿨다. `i18n.js`의 한국어 문자열이 바뀌면 서브셋을 다시 만든다(`assets/fonts/README.txt`).
+- 아이콘은 bgms.kr `public/logo.png`(앰버 기둥 로고)에서 만들었다.

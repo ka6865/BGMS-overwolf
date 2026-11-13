@@ -193,12 +193,64 @@
     }
 
     // BGMS 웹 세션 기록을 기본 브라우저로 연다. 앱 안에서 웹을 렌더링하지 않는다.
-    if (historyButton) {
-      historyButton.addEventListener("click", function () {
+    var replayButton = document.getElementById("match-card-review");
+
+    if (replayButton) {
+      replayButton.addEventListener("click", function () {
+        var controller = getController();
+
+        if (controller && typeof controller.openMatchReplay === "function") {
+          controller.openMatchReplay();
+        }
+      });
+    }
+
+    [historyButton].forEach(function (button) {
+      if (!button) {
+        return;
+      }
+
+      button.addEventListener("click", function () {
         var controller = getController();
 
         if (controller && typeof controller.openSessionHistory === "function") {
           controller.openSessionHistory();
+        }
+      });
+    });
+  }
+
+  function bindStatusStrip() {
+    var overlayCell = document.getElementById("status-overlay-cell");
+    var handoffCell = document.getElementById("status-handoff-cell");
+
+    if (overlayCell) {
+      overlayCell.addEventListener("click", function () {
+        var controller = getController();
+
+        if (!controller) {
+          return;
+        }
+
+        if (lastDiagnosticsState && lastDiagnosticsState.overlayVisible) {
+          controller.hideOverlay();
+        } else {
+          controller.showOverlay();
+        }
+      });
+    }
+
+    if (handoffCell) {
+      handoffCell.addEventListener("click", function () {
+        var disclosure = document.getElementById("settings-disclosure");
+        var toggle = document.getElementById("handoff-enabled");
+
+        if (disclosure) {
+          disclosure.open = true;
+        }
+
+        if (toggle && typeof toggle.focus === "function") {
+          toggle.focus();
         }
       });
     }
@@ -311,6 +363,240 @@
     }
   }
 
+  // GEP 맵 코드는 PUBG 공식 API 의 맵 코드와 같다. 모르는 코드는 _Main 만 떼고 보여준다.
+  var MAP_NAMES = {
+    Baltic_Main: "Erangel",
+    Erangel_Main: "Erangel",
+    Desert_Main: "Miramar",
+    Savage_Main: "Sanhok",
+    DihorOtok_Main: "Vikendi",
+    Tiger_Main: "Taego",
+    Kiki_Main: "Deston",
+    Neon_Main: "Rondo",
+    Summerland_Main: "Karakin",
+    Chimera_Main: "Paramo",
+    Heaven_Main: "Haven",
+    Range_Main: "Camp Jackal"
+  };
+  var MOMENT_KINDS = { death: "momentDeath", knockedout: "momentKnocked", revived: "momentRevived", bookmark: "momentBookmark" };
+  var MAX_CARD_MOMENTS = 6;
+
+  function formatClock(seconds) {
+    var whole = Math.max(0, Math.floor(seconds));
+    var rest = whole % 60;
+
+    return Math.floor(whole / 60) + ":" + (rest < 10 ? "0" : "") + rest;
+  }
+
+  // GEP mode 값(squad, squad-fpp 등)을 제목용으로 다듬는다.
+  function formatMode(mode) {
+    return String(mode || "").split("-").map(function (part) {
+      return part === "fpp" || part === "tpp" ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1);
+    }).join(" ");
+  }
+
+  function canReplay(state) {
+    var gep = window.bgmsGepState;
+
+    return Boolean(gep && typeof gep.buildReplayUrl === "function"
+      && gep.buildReplayUrl("", state, window.bgmsSettings.read()));
+  }
+
+  /*
+   * 최근 매치. 로컬 상태만으로 렌더하므로 전송 동의와 무관하게 보인다.
+   * 리플레이 버튼은 끝난 매치에 공식 match_id 와 닉네임이 있을 때만 켠다.
+   */
+  function renderMatchCard(state) {
+    var t = window.bgmsI18n.translate;
+    var settings = window.bgmsSettings.read();
+    var reviewButton = document.getElementById("match-card-review");
+    var started = Boolean(state && (state.matchStartedAt || state.matchEnded));
+    var hasDeath = false;
+    var moments;
+    var hint = "";
+
+    if (!state || !started) {
+      setText("match-card-map", t("matchCardTitle"));
+      setText("match-card-mode", "");
+      setText("match-card-status", t("matchCardEmpty"));
+      ["match-card-placement", "match-card-headshots", "match-card-longest", "match-card-moments"].forEach(function (id) {
+        setText(id, "--");
+      });
+    } else {
+      setText("match-card-status", state.matchEnded ? t("matchCardEnded") : t("matchCardLive"));
+      setText("match-card-map", state.mapName
+        ? MAP_NAMES[state.mapName] || String(state.mapName).replace(/_Main$/, "")
+        : t("matchCardTitle"));
+      setText("match-card-mode", state.matchMode ? formatMode(state.matchMode) : "");
+      setText("match-card-placement", state.rankPlace !== null && state.rankPlace !== undefined
+        ? "#" + state.rankPlace + (state.rankTotal ? " / " + state.rankTotal : "")
+        : "--");
+      setText("match-card-headshots", String(state.headshots || 0));
+      setText("match-card-longest", state.maxKillDistance !== null && state.maxKillDistance !== undefined
+        ? Math.round(state.maxKillDistance) + "m"
+        : "--");
+      moments = (state.eventTimeline || []).filter(function (entry) {
+        return MOMENT_KINDS[entry.kind] && typeof entry.t === "number";
+      }).slice(-MAX_CARD_MOMENTS).map(function (entry) {
+        hasDeath = hasDeath || entry.kind === "death";
+        return t(MOMENT_KINDS[entry.kind]) + " " + formatClock(entry.t);
+      });
+      setText("match-card-moments", moments.length ? moments.join(" · ") : t("matchCardNoMoments"));
+    }
+
+    if (!settings.playerName) {
+      hint = "matchCardHintNickname";
+    } else if (started && !state.matchEnded) {
+      hint = "matchCardHintLive";
+    } else if (started && !state.matchId) {
+      hint = "matchCardHintMatchId";
+    } else if (started) {
+      hint = "matchCardHintReplay";
+    }
+
+    setText("match-card-hint", hint ? t(hint) : "");
+    setText("match-card-review", t(hasDeath ? "matchCardReplayDeath" : "matchCardReplay"));
+
+    if (reviewButton) {
+      reviewButton.disabled = !canReplay(state);
+    }
+
+    var retryButton = document.getElementById("handoff-retry");
+
+    if (retryButton) {
+      // 대기 중인 요약이 없으면 다시 보낼 것이 없다.
+      retryButton.disabled = !(state && state.handoffPending > 0);
+    }
+  }
+
+  // 상태 띠의 한 칸. tone 은 off(꺼짐) / on(정상) / live(진행 중) / warn(주의) 중 하나다.
+  function setStatus(name, tone, text) {
+    var cell = document.getElementById("status-" + name + "-cell");
+
+    if (cell && cell.getAttribute("data-tone") !== tone) {
+      cell.setAttribute("data-tone", tone);
+    }
+
+    setText("status-" + name, text);
+  }
+
+  function renderStatus(state) {
+    var t = window.bgmsI18n.translate;
+    var settings = window.bgmsSettings.read();
+    var limited = Boolean(state && (state.gepStatus === "error"
+      || (window.bgmsGepState && window.bgmsGepState.isServiceDegraded(state))));
+
+    if (!state || !state.detectedGameRunning) {
+      setStatus("game", "off", t("statusGameOff"));
+    } else if (limited) {
+      setStatus("game", "warn", t("statusGameLimited"));
+    } else if (state.matchStartedAt && !state.matchEnded) {
+      setStatus("game", "live", t("statusGameLive"));
+    } else {
+      setStatus("game", "on", t("statusGameReady"));
+    }
+
+    setStatus("overlay", state && state.overlayVisible ? "on" : "off",
+      t(state && state.overlayVisible ? "statusOverlayShown" : "statusOverlayHidden"));
+
+    if (!settings.handoffEnabled) {
+      setStatus("handoff", "off", t("handoffOff"));
+    } else if (!settings.playerName) {
+      setStatus("handoff", "warn", t("statusNeedsNickname"));
+    } else if (state && state.handoffPending > 0) {
+      setStatus("handoff", "live", t("statusHandoffPending"));
+    } else if (state && (state.handoffOutcome === "rejected" || state.handoffOutcome === "dropped")) {
+      setStatus("handoff", "warn", describeHandoff(state));
+    } else {
+      setStatus("handoff", "on", state && state.handoffOutcome === "sent" ? t("handoffSent") : t("handoffIdle"));
+    }
+  }
+
+  var lastTrackKey = "";
+
+  /*
+   * 매치 길이를 가로 레일로 두고 순간(기절·사망·부활·북마크)을 경과 시각 위치에 찍는다.
+   * 길이는 종료 시각 또는 현재 시각 기준이며, 마지막 순간보다 짧으면 그 순간까지로 늘린다.
+   */
+  function renderTrack(state) {
+    var track = document.getElementById("match-track");
+    var moments;
+    var duration;
+    var key;
+
+    if (!track || typeof document.createElement !== "function") {
+      return;
+    }
+
+    moments = state && state.matchStartedAt ? (state.eventTimeline || []).filter(function (entry) {
+      return MOMENT_KINDS[entry.kind] && typeof entry.t === "number";
+    }) : [];
+    duration = 0;
+
+    if (state && state.matchStartedAt) {
+      duration = ((state.matchEndedAt ? Date.parse(state.matchEndedAt) : Date.now()) - Date.parse(state.matchStartedAt)) / 1000;
+    }
+
+    duration = Math.max(duration || 0, moments.length ? moments[moments.length - 1].t : 0, 1);
+    key = moments.map(function (entry) { return entry.kind + entry.t; }).join("|") + "@" + (state && state.matchEndedAt ? duration : "live");
+
+    if (key === lastTrackKey) {
+      return;
+    }
+
+    lastTrackKey = key;
+    track.textContent = "";
+    track.classList.toggle("is-empty", moments.length === 0);
+
+    function addMark(className, leftPercent, label, title) {
+      var mark = document.createElement("span");
+      var text = document.createElement("span");
+
+      mark.className = className;
+      mark.style.left = leftPercent.toFixed(2) + "%";
+
+      if (title) {
+        mark.title = title;
+      }
+
+      text.className = "moment-label";
+      text.textContent = label;
+      mark.appendChild(text);
+      track.appendChild(mark);
+
+      return mark;
+    }
+
+    // 끝 눈금 라벨이 첫/마지막 순간 라벨과 부딪히면 눈금만 남긴다.
+    var firstLeft = moments.length ? (moments[0].t / duration) * 100 : 100;
+    var lastLeft = moments.length ? (moments[moments.length - 1].t / duration) * 100 : 0;
+
+    if (state && state.matchStartedAt) {
+      addMark("track-tick is-start", 0, firstLeft < 8 ? "" : "0:00");
+    }
+
+    if (state && state.matchEndedAt) {
+      addMark("track-tick is-end", 100, lastLeft > 92 ? "" : formatClock(duration));
+    }
+
+    // 가까운 순간끼리 라벨이 겹치지 않게 바로 앞 라벨과 8% 안쪽이면 아래 줄로 내린다.
+    var previousLeft = -100;
+    var previousLow = false;
+
+    moments.forEach(function (entry) {
+      var left = Math.min(100, (entry.t / duration) * 100);
+      var low = left - previousLeft < 8 && !previousLow;
+      var mark = addMark("moment moment-" + entry.kind, left, formatClock(entry.t),
+        window.bgmsI18n.translate(MOMENT_KINDS[entry.kind]) + " " + formatClock(entry.t));
+
+      mark.classList.toggle("is-low", low);
+      // 표식끼리 거의 같은 자리면 뒤의 표식을 레일 위로 올려 둘 다 보이게 한다.
+      mark.classList.toggle("is-raised", left - previousLeft < 2.5);
+      previousLeft = left;
+      previousLow = low;
+    });
+  }
+
   function renderDiagnostics(state) {
     var seenFeatureKeys;
     var supportedFeatureList;
@@ -416,7 +702,7 @@
    */
   function syncHotkeyDisplay() {
     var controller = getController();
-    var fallback = { toggle_overlay: "Ctrl+Shift+B", open_desktop: "Ctrl+Shift+G" };
+    var fallback = { toggle_overlay: "Ctrl+Shift+B", open_desktop: "Ctrl+Shift+G", mark_moment: "Ctrl+Shift+M" };
 
     function render(assigned) {
       var t = window.bgmsI18n.translate;
@@ -425,11 +711,13 @@
       if (!assigned) {
         setText("hotkey-toggle-overlay", fallback.toggle_overlay);
         setText("hotkey-open-desktop", fallback.open_desktop);
+        setText("hotkey-mark-moment", fallback.mark_moment);
         return;
       }
 
       setText("hotkey-toggle-overlay", assigned.toggle_overlay || t("hotkeyUnassigned"));
       setText("hotkey-open-desktop", assigned.open_desktop || t("hotkeyUnassigned"));
+      setText("hotkey-mark-moment", assigned.mark_moment || t("hotkeyUnassigned"));
     }
 
     if (!controller || typeof controller.getAssignedHotkeys !== "function") {
@@ -482,6 +770,11 @@
     }
 
     section.classList.toggle("is-hidden", configured);
+
+    // 첫 설정이 남았으면 접힌 설정 영역을 펼쳐 전송 토글이 바로 보이게 한다.
+    if (!configured && document.getElementById("settings-disclosure")) {
+      document.getElementById("settings-disclosure").open = true;
+    }
 
     // 1단계 문구는 남은 작업에 따라 바꿔준다.
     setText("onboarding-step-1", settings.handoffEnabled
@@ -549,7 +842,9 @@
 
     disclosure.addEventListener("toggle", function () {
       if (disclosure.open) {
-        renderDiagnostics(lastDiagnosticsState);
+        renderStatus(lastDiagnosticsState);
+    renderMatchCard(lastDiagnosticsState);
+    renderDiagnostics(lastDiagnosticsState);
       }
     });
   }
@@ -558,6 +853,9 @@
 
   function handleDiagnosticsState(state) {
     lastDiagnosticsState = state;
+    renderStatus(state);
+    renderTrack(state);
+    renderMatchCard(state);
     renderDiagnostics(state);
   }
 
@@ -565,6 +863,8 @@
     var controller = getController();
 
     if (!controller || typeof controller.subscribe !== "function") {
+      renderStatus(null);
+      renderMatchCard(null);
       renderDiagnostics(null);
       return;
     }
@@ -576,6 +876,7 @@
   bindLanguageButtons();
   bindSettingsControls();
   bindServiceSettingsControls();
+  bindStatusStrip();
   bindDesktopDrag();
   bindDesktopClose();
   bindRefreshButton();
@@ -594,19 +895,25 @@
     syncLanguageButtons();
     syncSettingsControls();
     syncServiceSettingsControls();
+    renderStatus(lastDiagnosticsState);
+    renderMatchCard(lastDiagnosticsState);
     renderDiagnostics(lastDiagnosticsState);
   });
 
   // 다른 창이나 시나리오 코드가 설정을 바꿀 때도 컨트롤 상태를 맞춘다.
   window.addEventListener("bgms:service-settings-change", function () {
     syncServiceSettingsControls();
+    renderStatus(lastDiagnosticsState);
+    renderMatchCard(lastDiagnosticsState);
     renderDiagnostics(lastDiagnosticsState);
   });
 
   window.addEventListener("storage", function (event) {
     if (event.key === window.bgmsSettings.STORAGE_KEY) {
       syncServiceSettingsControls();
-      renderDiagnostics(lastDiagnosticsState);
+      renderStatus(lastDiagnosticsState);
+    renderMatchCard(lastDiagnosticsState);
+    renderDiagnostics(lastDiagnosticsState);
     }
   });
 

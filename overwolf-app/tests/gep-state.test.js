@@ -655,3 +655,19 @@ test("bookmark: 진행 중인 매치에서만 받고 매치당 상한을 지킨�
   state = gep.reduceGameEvent(state, "matchEnd", "");
   assert.equal(gep.reduceBookmark(state), state);
 });
+
+test("buildReplayUrl: 끝난 매치의 공식 UUID와 닉네임으로 마지막 사망 시각 리플레이를 만든다", () => {
+  const state = Object.assign(baseState(), {
+    matchEnded: true,
+    matchId: "match.bro.official.pc-2018-03.steam.solo.eu.2019.05.07.08.CE8D1A14-B2AF-41C8-8BF4-D2A504326630",
+    eventTimeline: [{ t: 90, kind: "death" }, { t: 1440.4, kind: "death" }]
+  });
+  const settings = { playerName: "My Nick", platform: "kakao" };
+
+  assert.equal(gep.buildReplayUrl("https://bgms.kr/replay/3d", state, settings),
+    "https://bgms.kr/replay/3d?matchId=ce8d1a14-b2af-41c8-8bf4-d2a504326630&nickname=My%20Nick&platform=kakao&t=1440");
+  assert.equal(gep.buildReplayUrl("x", Object.assign({}, state, { matchEnded: false }), settings), null);
+  assert.equal(gep.buildReplayUrl("x", Object.assign({}, state, { matchId: "pseudo-only" }), settings), null);
+  assert.equal(gep.buildReplayUrl("x", state, { playerName: "" }), null);
+  assert.ok(!gep.buildReplayUrl("x", Object.assign({}, state, { eventTimeline: [] }), settings).includes("&t="));
+});

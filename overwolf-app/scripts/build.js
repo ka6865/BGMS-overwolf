@@ -28,8 +28,12 @@ const RUNTIME_FILES = [
   "assets/bgms-icon-gray.svg",
   "assets/bgms-icon.png",
   "assets/bgms-icon.svg",
-  "assets/bgms-pattern.svg",
-  "assets/desktop-icon.ico"
+  "assets/desktop-icon.ico",
+  "assets/fonts/outfit-latin-wght.woff2",
+  "assets/fonts/OFL.txt",
+  "assets/fonts/bgms-korean-subset.woff2",
+  "assets/fonts/Pretendard-LICENSE.txt",
+  "assets/fonts/README.txt"
 ];
 
 function copyRuntimeFile(relativePath) {
